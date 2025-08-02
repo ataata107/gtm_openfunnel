@@ -22,10 +22,22 @@ This system automatically:
 - **REST API**: Simple synchronous FastAPI endpoints
 
 ### **Agent Pipeline:**
+
+![GTM Intelligence Workflow](gtm_graph.png)
+
 ```
 Query Agent → Company Aggregator → Multi-Source Search → 
 Website Scraper → Evaluator → Quality Evaluator → Strategy Refinement
 ```
+
+**Workflow Details:**
+1. **Query Agent**: Generates diverse search strategies using LLM
+2. **Company Aggregator**: Extracts companies from search results
+3. **Multi-Source Search**: Performs parallel web searches
+4. **Website Scraper**: Extracts content from company websites
+5. **Evaluator**: Assesses evidence against research goals
+6. **Quality Evaluator**: Analyzes research coverage and quality
+7. **Strategy Refinement**: Generates improved strategies based on gaps
 
 ## 🚀 **Quick Start**
 
@@ -209,6 +221,7 @@ OpenFunnel/
 │   ├── prompts/         # LLM prompts
 │   ├── simple_server.py # Simple API server startup
 │   ├── server.py        # Complex API server startup
+│   ├── gtm_graph.png    # Workflow visualization
 │   └── API_README.md    # Detailed API documentation
 ```
 
