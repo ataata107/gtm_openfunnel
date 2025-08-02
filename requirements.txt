@@ -1,12 +1,27 @@
-langchain==0.3.27
-langchain-openai==0.1.25
-langgraph==0.6.2
-openai==1.98.0
-pydantic==2.11.7
-python-dotenv==1.1.1
-requests==2.32.4
-firecrawl-py==0.1.0
-aiohttp==3.12.15
-psutil==7.0.0
-fastapi==0.116.1
-uvicorn==0.47.2
+# Core LangChain ecosystem
+langchain
+langchain-openai
+langgraph
+
+# OpenAI and AI
+openai
+
+# Web scraping and HTTP
+firecrawl-py
+requests
+aiohttp
+
+# API framework
+fastapi
+uvicorn
+
+# Data validation and typing
+pydantic
+typing-extensions
+
+# Environment and utilities
+python-dotenv
+psutil
+
+# Optional: For production deployment
+# gunicorn

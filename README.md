@@ -52,7 +52,7 @@ python -m venv openfunnel
 source openfunnel/bin/activate  # On Windows: openfunnel\Scripts\activate
 
 # Install dependencies
-pip install -r gtm-langgraph/requirements.txt
+pip install -r requirements.txt
 ```
 
 ### **2. Configure API Keys**
