@@ -106,17 +106,28 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
 
     print("🔍 Running Serper and extracting companies using GPT-4o-mini...")
     
+    # TIME SERPER API CALLS
+    import time
+    serper_start = time.time()
+    
     # Create semaphore in the same loop context
     async def main():
         sem = asyncio.Semaphore(state.max_parallel_searches)
         return await run_all(sem)
     
     search_results = asyncio.run(main())
+    
+    serper_end = time.time()
+    serper_duration = (serper_end - serper_start) * 1000
+    print(f"⏱️  Serper API calls took: {serper_duration:.2f}ms ({serper_duration/1000:.2f}s)")
 
     extractor = LLMCompanyExtractor()
     extracted_companies = []
     seen_domains = set()
 
+    # TIME LLM EXTRACTION
+    llm_start = time.time()
+    
     # Run LLM extractions asynchronously
     async def extract_companies_async():
         sem = asyncio.Semaphore(state.max_parallel_searches)  # Limit concurrent LLM calls
@@ -128,8 +139,13 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
                     return []
                 
                 try:
-                    companies = extractor.extract(result, state.research_goal)
-                    # print(f"📊 Extracted {len(companies)} companies from search result")
+                    # Use async LLM call for better performance
+                    input_text = extractor.prompt.format(
+                        search_result=result,
+                        research_goal=state.research_goal
+                    )
+                    structured_response = await extractor.structured_llm.ainvoke(input_text)
+                    companies = structured_response.companies
                     return companies
                 except Exception as e:
                     print("❌ LLM failed to parse companies:", e)
@@ -148,6 +164,13 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
 
     # Run the async extraction
     asyncio.run(extract_companies_async())
+    
+    llm_end = time.time()
+    llm_duration = (llm_end - llm_start) * 1000
+    print(f"⏱️  LLM extraction took: {llm_duration:.2f}ms ({llm_duration/1000:.2f}s)")
+    
+    total_duration = (llm_end - serper_start) * 1000
+    print(f"⏱️  Total time: {total_duration:.2f}ms ({total_duration/1000:.2f}s)")
 
     # ✅ Save to disk for debugging
     os.makedirs("debug_output", exist_ok=True)

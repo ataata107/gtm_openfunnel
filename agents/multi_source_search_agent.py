@@ -55,8 +55,8 @@ Return a structured response with:
 - search_focus: Primary focus area for these queries
 """)
 
-    def build_queries(self, company_name: str, domain: str, research_goal: str, refined_strategies: list = None) -> List[str]:
-        """Build queries synchronously to avoid asyncio issues"""
+    async def build_queries_async(self, company_name: str, domain: str, research_goal: str, refined_strategies: list = None) -> List[str]:
+        """Build queries asynchronously using ainvoke"""
         refined_strategies_text = "None available"
         if refined_strategies:
             strategy_texts = []
@@ -75,7 +75,7 @@ Return a structured response with:
         }
         
         try:
-            structured_response = self.structured_llm.invoke(self.prompt.format(**prompt_input))
+            structured_response = await self.structured_llm.ainvoke(self.prompt.format(**prompt_input))
             queries = structured_response.queries
             
             if not queries:
@@ -95,10 +95,6 @@ Return a structured response with:
 # Initialize the LLM query builder
 llm_query_builder = LLMQueryBuilder()
 
-def build_queries(company_name: str, domain: str, research_goal: str, refined_strategies: list = None) -> list:
-    """Build search queries for a company using LLM for intelligent query generation with structured output"""
-    return llm_query_builder.build_queries(company_name, domain, research_goal, refined_strategies)
-
 async def run_serper(query: str, sem: asyncio.Semaphore):
     """Run Serper search with connection pooling"""
     async with sem:
@@ -117,16 +113,16 @@ async def _make_serper_request(query: str) -> List[str]:
     headers = {"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"}
     payload = {"q": query, "num": 10}
     
-    # Use asyncio.to_thread for synchronous requests
-    def make_request():
-        response = requests.post(url, headers=headers, json=payload)
-        if response.status_code == 200:
-            data = response.json()
-            return [item.get("snippet", "") for item in data.get("organic", [])]
-        else:
-            raise Exception(f"Serper API error: {response.status_code}")
+    # Use asyncio.to_thread for synchronous requests - same as company_aggregator_agent
+    response = await asyncio.to_thread(
+        requests.post, url, headers=headers, json=payload
+    )
     
-    return await asyncio.to_thread(make_request)
+    if response.status_code == 200:
+        data = response.json()
+        return [item.get("snippet", "") for item in data.get("organic", [])]
+    else:
+        raise Exception(f"Serper API error: {response.status_code}")
 
 def multi_source_search_agent(state: GTMState) -> GTMState:
     if not state.extracted_companies:
@@ -146,19 +142,47 @@ def multi_source_search_agent(state: GTMState) -> GTMState:
     else:
         print(f"📝 Using default search strategies")
 
-    async def run_all():
-        sem = asyncio.Semaphore(state.max_parallel_searches)
-        tasks = []
+    # TIME QUERY GENERATION
+    import time
+    query_start = time.time()
+    total_start = time.time()
 
+    async def generate_queries():
+        """Generate queries for all companies using async LLM calls"""
         print(f"🔍 Building queries for {len(state.extracted_companies)} companies...")
-        for company in state.extracted_companies:
-            queries = build_queries(company.name, company.domain, search_goal, refined_strategies)
-            print(f"  📝 {company.name} ({company.domain}): {queries}")
-            for query in queries:
-                tasks.append(run_serper(query, sem))
+        
+        # Create semaphore for concurrent LLM calls
+        sem = asyncio.Semaphore(state.max_parallel_searches)
+        
+        async def generate_queries_for_company(company):
+            """Generate queries for a single company using async LLM"""
+            async with sem:
+                try:
+                    queries = await llm_query_builder.build_queries_async(company.name, company.domain, search_goal, refined_strategies)
+                    print(f"  📝 {company.name} ({company.domain}): {queries}")
+                    return queries
+                except Exception as e:
+                    print(f"❌ LLM failed to generate queries for {company.name}: {e}")
+                    # Fallback to simple queries
+                    return [f"{company.name} {search_goal}", f"{company.domain} {search_goal}"]
+        
+        # Run all query generations in parallel
+        query_tasks = [generate_queries_for_company(company) for company in state.extracted_companies]
+        all_company_queries = await asyncio.gather(*query_tasks)
+        
+        # Flatten the results
+        all_queries = []
+        for queries in all_company_queries:
+            all_queries.extend(queries)
+        
+        return all_queries
 
+    async def run_serper_searches(queries):
+        """Run Serper API calls for all queries"""
+        sem = asyncio.Semaphore(state.max_parallel_searches)
+        tasks = [run_serper(query, sem) for query in queries]
         results = await asyncio.gather(*tasks)
-
+        
         # ✅ Write to serper-specific field
         search_results_serper = dict(state.search_results_serper or {})
         print(f"📊 Processing {len(results)} search results...")
@@ -182,8 +206,26 @@ def multi_source_search_agent(state: GTMState) -> GTMState:
 
         return search_results_serper
 
+    # Generate queries
+    queries = asyncio.run(generate_queries())
+    
+    query_end = time.time()
+    query_duration = (query_end - query_start) * 1000
+    print(f"⏱️  Query generation took: {query_duration:.2f}ms ({query_duration/1000:.2f}s)")
+
+    # TIME SERPER API CALLS
+    serper_start = time.time()
+    
     print("🔎 Running multi-source search for companies...")
-    serper_results = asyncio.run(run_all())
+    serper_results = asyncio.run(run_serper_searches(queries))
+    
+    serper_end = time.time()
+    serper_duration = (serper_end - serper_start) * 1000
+    print(f"⏱️  Serper API calls took: {serper_duration:.2f}ms ({serper_duration/1000:.2f}s)")
+    
+    total_end = time.time()
+    total_duration = (total_end - total_start) * 1000
+    print(f"⏱️  Total multi-source search time: {total_duration:.2f}ms ({total_duration/1000:.2f}s)")
 
     # ✅ Save to disk for debugging
     os.makedirs("debug_output", exist_ok=True)
