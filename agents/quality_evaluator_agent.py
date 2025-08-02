@@ -8,6 +8,7 @@ from typing import List, Dict, Optional, Any
 import asyncio
 import os
 import json
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -149,13 +150,29 @@ Return a structured analysis with:
         
         print(f"🔍 Running parallel quality analysis for {len(state.final_findings)} companies...")
         
-        # Run parallel evaluations for each company
+        # Create semaphore to limit concurrent LLM calls
+        sem = asyncio.Semaphore(state.max_parallel_searches)
+        
+        async def evaluate_company_with_semaphore(finding):
+            """Evaluate a single company with semaphore control"""
+            async with sem:
+                return await self.company_evaluator.evaluate_single_company(finding, state.research_goal)
+        
+        # Run parallel evaluations for each company with semaphore control
         company_tasks = [
-            self.company_evaluator.evaluate_single_company(finding, state.research_goal)
+            evaluate_company_with_semaphore(finding)
             for finding in state.final_findings
         ]
         
+        # TIME INDIVIDUAL COMPANY ANALYSIS
+        import time
+        individual_start = time.time()
+        
         company_analyses = await asyncio.gather(*company_tasks)
+        
+        individual_end = time.time()
+        individual_duration = (individual_end - individual_start) * 1000
+        print(f"⏱️  Individual company analysis took: {individual_duration:.2f}ms ({individual_duration/1000:.2f}s)")
         
         # Calculate aggregate statistics
         avg_quality_score = sum(analysis.quality_score for analysis in company_analyses) / len(company_analyses)
@@ -175,7 +192,7 @@ Return a structured analysis with:
             Recommendations: {analysis.recommendations}
             """
         
-        # Generate overall analysis
+        # Generate overall analysis using async call
         input_text = self.aggregation_prompt.format(
             research_goal=state.research_goal,
             company_analyses=company_analyses_text,
@@ -186,7 +203,14 @@ Return a structured analysis with:
             low_quality_count=low_quality_count
         )
         
-        overall_analysis = self.structured_llm.invoke(input_text)
+        # TIME AGGREGATION ANALYSIS
+        aggregation_start = time.time()
+        
+        overall_analysis = await self.structured_llm.ainvoke(input_text)
+        
+        aggregation_end = time.time()
+        aggregation_duration = (aggregation_end - aggregation_start) * 1000
+        print(f"⏱️  Aggregation analysis took: {aggregation_duration:.2f}ms ({aggregation_duration/1000:.2f}s)")
         
         # Add company analyses to the result
         overall_analysis.company_analyses = company_analyses
@@ -202,11 +226,18 @@ def quality_evaluator_agent(state: GTMState) -> GTMState:
     
     print("🔍 Analyzing research coverage and quality (parallel processing)...")
     
+    # TIME QUALITY EVALUATION
+    quality_start = time.time()
+    
     evaluator = QualityEvaluator()
     
     try:
         # Run parallel analysis
         analysis = asyncio.run(evaluator.analyze_coverage_and_quality_parallel(state))
+        
+        quality_end = time.time()
+        quality_duration = (quality_end - quality_start) * 1000
+        print(f"⏱️  Quality evaluation took: {quality_duration:.2f}ms ({quality_duration/1000:.2f}s)")
         
         # print(f"📊 Quality Analysis Results:")
         # print(f"  Coverage Score: {analysis.coverage_score:.2f}/1.0")
@@ -244,7 +275,7 @@ def quality_evaluator_agent(state: GTMState) -> GTMState:
         output_path = os.path.join("debug_output", "quality_analysis.json")
         try:
             with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(analysis.dict(), f, ensure_ascii=False, indent=2)
+                json.dump(analysis.model_dump(), f, ensure_ascii=False, indent=2)
             print(f"📁 Saved quality analysis to {output_path}")
         except Exception as e:
             print(f"⚠️ Failed to write quality analysis: {e}")
@@ -257,7 +288,7 @@ def quality_evaluator_agent(state: GTMState) -> GTMState:
             "coverage_gaps": analysis.coverage_gaps,
             "evidence_issues": analysis.evidence_issues,
             "recommendations": analysis.recommendations,
-            "company_analyses": [analysis.dict() for analysis in analysis.company_analyses]
+            "company_analyses": [analysis.model_dump() for analysis in analysis.company_analyses]
         }
         
         return state.model_copy(update={"quality_metrics": quality_metrics})

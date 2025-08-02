@@ -104,7 +104,7 @@ async def run_serper(query: str, sem: asyncio.Semaphore):
             return query, response
             
         except Exception as e:
-            print(f"❌ Serper search failed for '{query}': {e}")
+            # print(f"❌ Serper search failed for '{query}': {e}")
             return query, []
 
 async def _make_serper_request(query: str) -> List[str]:
@@ -159,7 +159,7 @@ def multi_source_search_agent(state: GTMState) -> GTMState:
             async with sem:
                 try:
                     queries = await llm_query_builder.build_queries_async(company.name, company.domain, search_goal, refined_strategies)
-                    print(f"  📝 {company.name} ({company.domain}): {queries}")
+                    # print(f"  📝 {company.name} ({company.domain}): {queries}")
                     return queries
                 except Exception as e:
                     print(f"❌ LLM failed to generate queries for {company.name}: {e}")
@@ -196,11 +196,11 @@ def multi_source_search_agent(state: GTMState) -> GTMState:
                     break
             
             if matched_company:
-                print(f"  ✅ Matched query '{query}' to {matched_company.domain} got {len(result)} results")
+                # print(f"  ✅ Matched query '{query}' to {matched_company.domain} got {len(result)} results")
                 search_results_serper.setdefault(matched_company.domain, []).extend(result)
             else:
                 # Fallback: try to extract domain from query or use a default
-                print(f"⚠️ Could not match query '{query}' to any company domain")
+                # print(f"⚠️ Could not match query '{query}' to any company domain")
                 # Add to a general bucket to avoid losing data
                 search_results_serper.setdefault("unknown", []).extend(result)
 

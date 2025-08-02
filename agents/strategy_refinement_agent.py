@@ -144,20 +144,20 @@ def strategy_refinement_agent(state: GTMState) -> GTMState:
     try:
         refinement_output = refiner.generate_refined_strategies(state)
         
-        print(f"📊 Strategy Refinement Results:")
-        print(f"  Refined Strategies: {len(refinement_output.refined_strategies)}")
-        print(f"  Total New Queries: {refinement_output.total_new_queries}")
+        # print(f"📊 Strategy Refinement Results:")
+        # print(f"  Refined Strategies: {len(refinement_output.refined_strategies)}")
+        # print(f"  Total New Queries: {refinement_output.total_new_queries}")
         
-        # Show refined strategies
-        for i, strategy in enumerate(refinement_output.refined_strategies, 1):
-            print(f"\n🎯 Strategy {i}: {strategy.strategy_type.upper()}")
-            print(f"  Priority: {strategy.priority}/5")
-            print(f"  Target Companies: {strategy.target_companies}")
-            print(f"  Data Sources: {strategy.data_sources}")
-            print(f"  Reasoning: {strategy.reasoning}")
-            print(f"  Queries ({len(strategy.search_queries)}):")
-            for j, query in enumerate(strategy.search_queries, 1):
-                print(f"    {j}. {query}")
+        # # Show refined strategies
+        # for i, strategy in enumerate(refinement_output.refined_strategies, 1):
+        #     print(f"\n🎯 Strategy {i}: {strategy.strategy_type.upper()}")
+        #     print(f"  Priority: {strategy.priority}/5")
+        #     print(f"  Target Companies: {strategy.target_companies}")
+        #     print(f"  Data Sources: {strategy.data_sources}")
+        #     print(f"  Reasoning: {strategy.reasoning}")
+        #     print(f"  Queries ({len(strategy.search_queries)}):")
+        #     for j, query in enumerate(strategy.search_queries, 1):
+        #         print(f"    {j}. {query}")
         
         # Save refinement results
         os.makedirs("debug_output", exist_ok=True)
