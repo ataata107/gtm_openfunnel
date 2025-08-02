@@ -4,15 +4,21 @@ Simple API Test with Mock Data
 
 This script demonstrates the REST API functionality using mock data
 to show the complete request/response workflow.
+Located in tests/ folder for better organization.
 """
 
 import requests
 import json
 import time
+import sys
+import os
 from datetime import datetime
 
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # API base URL
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8001"
 
 def test_complete_workflow():
     """Test the complete API workflow with mock data"""
@@ -27,7 +33,7 @@ def test_complete_workflow():
     print()
     
     # 2. Start research
-    print("2. Starting research batch...")
+    print("2. Starting research...")
     research_request = {
         "research_goal": "Find fintech companies using AI for fraud detection",
         "search_depth": "comprehensive",
@@ -36,53 +42,29 @@ def test_complete_workflow():
         "max_iterations": 2
     }
     
-    response = requests.post(f"{BASE_URL}/research/batch", json=research_request)
+    response = requests.post(f"{BASE_URL}/research", json=research_request)
     print(f"   Status: {response.status_code}")
     result = response.json()
-    research_id = result['research_id']
-    print(f"   Research ID: {research_id}")
+    print(f"   Research Goal: {result['research_goal']}")
     print(f"   Status: {result['status']}")
     print()
     
-    # 3. Check status
-    print("3. Checking research status...")
-    response = requests.get(f"{BASE_URL}/research/{research_id}/status")
-    print(f"   Status: {response.status_code}")
-    status_result = response.json()
-    print(f"   Research Status: {status_result['status']}")
-    print(f"   Progress: {status_result['progress']}%")
-    print(f"   Current Step: {status_result['current_step']}")
-    print()
+    # 3. Display results
+    print("3. Research Results:")
+    print(f"   Total Companies: {result['total_companies']}")
+    print(f"   Search Strategies: {result['search_strategies_generated']}")
+    print(f"   Total Searches: {result['total_searches_executed']}")
+    print(f"   Processing Time: {result['processing_time_ms']}ms")
     
-    # 4. List all sessions
-    print("4. Listing all research sessions...")
-    response = requests.get(f"{BASE_URL}/research")
-    print(f"   Status: {response.status_code}")
-    sessions_result = response.json()
-    print(f"   Total Sessions: {len(sessions_result['sessions'])}")
-    for session in sessions_result['sessions']:
-        print(f"   - {session['research_id'][:8]}... ({session['status']})")
-    print()
+    if result['results']:
+        print("\n📊 Sample Results:")
+        for i, company_result in enumerate(result['results'][:3]):  # Show first 3
+            print(f"  {i+1}. {company_result['domain']}")
+            print(f"     Confidence: {company_result['confidence_score']}")
+            print(f"     Evidence Sources: {company_result['evidence_sources']}")
+            print(f"     Signals Found: {company_result['signals_found']}")
     
-    # 5. Get results (will show failed status since we don't have env vars)
-    print("5. Getting research results...")
-    response = requests.get(f"{BASE_URL}/research/{research_id}")
-    print(f"   Status: {response.status_code}")
-    results = response.json()
-    print(f"   Research Status: {results['status']}")
-    print(f"   Total Companies: {results['total_companies']}")
-    print(f"   Search Strategies: {results['search_strategies_generated']}")
-    print(f"   Total Searches: {results['total_searches_executed']}")
-    print(f"   Processing Time: {results['processing_time_ms']}ms")
     print()
-    
-    print("✅ API workflow test completed!")
-    print("\n📋 API Endpoints Tested:")
-    print("   ✅ POST /research/batch - Start research")
-    print("   ✅ GET /research/{id}/status - Check status")
-    print("   ✅ GET /research - List sessions")
-    print("   ✅ GET /research/{id} - Get results")
-    print("   ✅ GET /health - Health check")
 
 def test_api_documentation():
     """Test API documentation endpoints"""
@@ -111,8 +93,7 @@ def demonstrate_expected_response():
     print("=" * 40)
     
     expected_response = {
-        "research_id": "uuid-example",
-        "status": "completed",
+        "research_goal": "Find fintech companies using AI for fraud detection",
         "total_companies": 150,
         "search_strategies_generated": 12,
         "total_searches_executed": 1847,
@@ -156,8 +137,7 @@ def demonstrate_expected_response():
             "cache_hit_rate": 0.34,
             "failed_requests": 12
         },
-        "created_at": "2024-01-01T00:00:00",
-        "updated_at": "2024-01-01T00:00:00"
+        "status": "completed"
     }
     
     print("✅ Expected successful response format:")
@@ -188,12 +168,12 @@ def main():
         print("\n🎉 All tests completed successfully!")
         print("\n💡 To test with real data:")
         print("   1. Set up environment variables (OPENAI_API_KEY, SERPER_API_KEY, etc.)")
-        print("   2. Run: python test_api.py")
-        print("   3. Or use the interactive docs at: http://localhost:8000/docs")
+        print("   2. Run: python tests/test_simple_api.py")
+        print("   3. Or use the interactive docs at: http://localhost:8001/docs")
         
     except requests.exceptions.ConnectionError:
         print("❌ Error: Could not connect to API server")
-        print("   Make sure the server is running: python server.py")
+        print("   Make sure the server is running: python simple_server.py")
     except Exception as e:
         print(f"❌ Error: {e}")
 

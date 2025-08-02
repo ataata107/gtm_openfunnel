@@ -19,7 +19,7 @@ This system automatically:
 - **External APIs**: Serper (Google Search), FireCrawl (Web Scraping)
 - **Quality Analysis**: Automated research quality assessment
 - **Strategy Refinement**: Dynamic query generation and optimization
-- **REST API**: FastAPI-based REST endpoints for integration
+- **REST API**: Simple synchronous FastAPI endpoints
 
 ### **Agent Pipeline:**
 ```
@@ -59,26 +59,30 @@ cd gtm-langgraph
 python main.py
 ```
 
-#### **Option B: REST API Server**
+#### **Option B: Simple REST API Server**
 ```bash
 cd gtm-langgraph
-python server.py
+python simple_server.py
 ```
 
 The API server will be available at:
-- **API Server**: http://localhost:8000
-- **Interactive Docs**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/health
+- **API Server**: http://localhost:8001
+- **Interactive Docs**: http://localhost:8001/docs
+- **Health Check**: http://localhost:8001/health
 
 ## 🌐 **REST API**
 
-### **Quick API Test**
+### **Simple Synchronous API**
+
+The system provides a simple, synchronous REST API that directly executes the GTM workflow and returns results.
+
+#### **Quick API Test**
 ```bash
 # Test the API
-python test_api_simple.py
+python tests/test_simple_api.py
 
 # Or use curl
-curl -X POST "http://localhost:8000/research/batch" \
+curl -X POST "http://localhost:8001/research" \
   -H "Content-Type: application/json" \
   -d '{
     "research_goal": "Find fintech companies using AI for fraud detection",
@@ -88,18 +92,14 @@ curl -X POST "http://localhost:8000/research/batch" \
   }'
 ```
 
-### **API Endpoints**
+#### **API Endpoints**
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `POST /research/batch` | POST | Start a new research batch |
-| `GET /research/{id}` | GET | Get research results |
-| `GET /research/{id}/status` | GET | Get research status |
-| `GET /research` | GET | List all research sessions |
-| `DELETE /research/{id}` | DELETE | Delete research session |
+| `POST /research` | POST | Start a research (synchronous) |
 | `GET /health` | GET | Health check |
 
-### **Example Request/Response**
+#### **Example Request/Response**
 
 **Request:**
 ```json
@@ -114,8 +114,7 @@ curl -X POST "http://localhost:8000/research/batch" \
 **Response:**
 ```json
 {
-    "research_id": "uuid",
-    "status": "completed",
+    "research_goal": "Find fintech companies using AI for fraud detection",
     "total_companies": 150,
     "search_strategies_generated": 12,
     "total_searches_executed": 1847,
@@ -131,18 +130,26 @@ curl -X POST "http://localhost:8000/research/batch" \
                 "technologies": ["TensorFlow", "scikit-learn"],
                 "evidence": [...],
                 "signals_found": 8
-            }
+            },
+            "signals_found": 8
         }
     ],
     "search_performance": {
         "queries_per_second": 65,
         "cache_hit_rate": 0.34,
         "failed_requests": 12
-    }
+    },
+    "status": "completed"
 }
 ```
 
-For detailed API documentation, see [API_README.md](API_README.md).
+### **Key Features**
+- ✅ **Synchronous execution**: Direct workflow execution
+- ✅ **Real-time logging**: All workflow steps visible in console
+- ✅ **Simple interface**: Single endpoint for research
+- ✅ **Immediate results**: Complete response when done
+- ✅ **Error handling**: Clear error messages
+- ✅ **Interactive docs**: Auto-generated at `/docs`
 
 ## 📊 **Example Output**
 
@@ -177,9 +184,9 @@ The system generates comprehensive research findings:
 - **Strategy Refinement**: Improves search effectiveness
 
 ### **🌐 REST API Features**
-- **Background Processing**: Non-blocking research execution
-- **Real-time Status**: Progress monitoring and status updates
-- **Session Management**: Research session tracking
+- **Synchronous Processing**: Direct workflow execution
+- **Real-time Logging**: Console output for all steps
+- **Simple Interface**: Single endpoint for research
 - **Performance Metrics**: Comprehensive analytics
 - **Interactive Documentation**: Auto-generated API docs
 
@@ -192,10 +199,16 @@ OpenFunnel/
 │   ├── graph/           # LangGraph workflow definition
 │   ├── utils/           # Utility functions
 │   ├── app/             # API endpoints
+│   │   ├── api.py       # Complex async API (optional)
+│   │   └── simple_api.py # Simple synchronous API
+│   ├── tests/           # Test files
+│   │   ├── test_simple_api.py
+│   │   ├── test_api.py
+│   │   ├── test_api_simple.py
+│   │   └── test_logs.py
 │   ├── prompts/         # LLM prompts
-│   ├── server.py        # API server startup
-│   ├── test_api.py      # API test client
-│   ├── test_api_simple.py # Simple API test
+│   ├── simple_server.py # Simple API server startup
+│   ├── server.py        # Complex API server startup
 │   └── API_README.md    # Detailed API documentation
 ```
 
@@ -206,17 +219,25 @@ OpenFunnel/
 python main.py
 ```
 
-### **Test the API**
+### **Test the Simple API**
 ```bash
 # Start the server
-python server.py
+python simple_server.py
 
 # In another terminal, test the API
-python test_api_simple.py
+python tests/test_simple_api.py
+```
+
+### **Run All Tests**
+```bash
+# Run individual test files
+python tests/test_simple_api.py
+python tests/test_api_simple.py
+python tests/test_logs.py
 ```
 
 ### **Interactive API Testing**
-Visit http://localhost:8000/docs for interactive API documentation and testing.
+Visit http://localhost:8001/docs for interactive API documentation and testing.
 
 ## 📈 **Performance Metrics**
 
@@ -244,16 +265,16 @@ The system achieves impressive performance:
 
 ### **Development**
 ```bash
-python server.py
+python simple_server.py
 ```
 
 ### **Production**
 ```bash
 # Use gunicorn for production
-gunicorn app.api:app -w 4 -k uvicorn.workers.UvicornWorker
+gunicorn app.simple_api:app -w 4 -k uvicorn.workers.UvicornWorker
 
 # Or use uvicorn directly
-uvicorn app.api:app --host 0.0.0.0 --port 8000
+uvicorn app.simple_api:app --host 0.0.0.0 --port 8001
 ```
 
 ## 📚 **Documentation**
@@ -261,13 +282,14 @@ uvicorn app.api:app --host 0.0.0.0 --port 8000
 - **[API Documentation](API_README.md)**: Complete REST API guide
 - **[Agent Documentation](agents/)**: Individual agent implementations
 - **[Graph Documentation](graph/)**: LangGraph workflow details
+- **[Test Documentation](tests/)**: Comprehensive test suite
 
 ## 🤝 **Contributing**
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests
+4. Add tests to the `tests/` folder
 5. Submit a pull request
 
 ## 📄 **License**

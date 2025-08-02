@@ -4,11 +4,17 @@ Test Script to Show Detailed Logs
 
 This script demonstrates the detailed logging functionality
 by running a simplified version of the GTM workflow.
+Located in tests/ folder for better organization.
 """
 
 import logging
 import time
+import sys
+import os
 from datetime import datetime
+
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Configure detailed logging
 logging.basicConfig(
