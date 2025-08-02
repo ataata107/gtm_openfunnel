@@ -44,7 +44,7 @@ Website Scraper → Evaluator → Quality Evaluator → Strategy Refinement
 ### **1. Setup Environment**
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/ataata107/gtm_openfunnel.git
 cd OpenFunnel
 
 # Create virtual environment
