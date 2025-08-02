@@ -43,13 +43,14 @@ Return a Pydantic model with:
 """
         )
 
-    def evaluate(self, research_goal: str, company: str, evidence: List[str]) -> EvaluationOutput:
+    async def evaluate_async(self, research_goal: str, company: str, evidence: List[str]) -> EvaluationOutput:
+        """Async version of evaluate using ainvoke"""
         input_text = self.prompt.format(
             research_goal=research_goal,
             company=company,
             evidence="\n".join(evidence)
         )
-        return self.structured_llm.invoke(input_text)
+        return await self.structured_llm.ainvoke(input_text)
 
 
 def evaluator_agent(state: GTMState) -> GTMState:
@@ -59,11 +60,14 @@ def evaluator_agent(state: GTMState) -> GTMState:
     evaluator = LLMEvidenceEvaluator()
     findings = []
     total_snippets = 0
-    start = time.time()
+    
+    # TIME EVALUATION
+    import time
+    eval_start = time.time()
 
     # Run evaluations asynchronously
     async def evaluate_companies_async():
-        global total_snippets  # Allow access to module-level variable
+        nonlocal total_snippets  # Use nonlocal instead of global
         sem = asyncio.Semaphore(state.max_parallel_searches)  # Limit concurrent LLM calls
         
         async def evaluate_single_company(company):
@@ -88,7 +92,8 @@ def evaluator_agent(state: GTMState) -> GTMState:
                 # print(f"Total Evidence snippets: {len(evidence_snippets)} for company: {company.name} | Serper snippets: {len(serper_snippets)} | Website snippets: {len(website_snippets)}")
 
                 try:
-                    structured = evaluator.evaluate(state.research_goal, company.name, evidence_snippets)
+                    # Use async evaluation
+                    structured = await evaluator.evaluate_async(state.research_goal, company.name, evidence_snippets)
                     
                     # Convert confidence level to numeric score
                     confidence_score = {
@@ -123,14 +128,16 @@ def evaluator_agent(state: GTMState) -> GTMState:
         for finding in all_findings:
             if finding is not None:
                 findings.append(finding)
-                # total_snippets += finding.evidence_sources
+                total_snippets += finding.evidence_sources
 
     # Run the async evaluation
     asyncio.run(evaluate_companies_async())
 
-    elapsed_ms = int((time.time() - start) * 1000)
+    eval_end = time.time()
+    eval_duration = (eval_end - eval_start) * 1000
+    print(f"⏱️  Evaluation took: {eval_duration:.2f}ms ({eval_duration/1000:.2f}s)")
 
-    print(f"\n📊 Evaluated {len(findings)} companies from {total_snippets} snippets in {elapsed_ms} ms.")
+    print(f"\n📊 Evaluated {len(findings)} companies from {total_snippets} snippets in {eval_duration:.2f}ms.")
 
     # Save findings to disk for analysis
     os.makedirs("debug_output", exist_ok=True)
