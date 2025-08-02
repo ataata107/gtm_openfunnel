@@ -73,3 +73,4 @@ class RedisCache:
 
 # Global cache instance
 cache = RedisCache()
+

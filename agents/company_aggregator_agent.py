@@ -8,8 +8,12 @@ from dotenv import load_dotenv
 import os
 import json
 import requests
+import logging
 
 load_dotenv()
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
@@ -94,6 +98,10 @@ async def run_serper(query: str, sem: asyncio.Semaphore):
             return f"Error: {str(e)}"
 
 def company_aggregator_agent(state: GTMState) -> GTMState:
+    logger.info("🏢 COMPANY AGGREGATOR: Starting company extraction...")
+    logger.info(f"📋 Research Goal: {state.research_goal}")
+    logger.info(f"🔍 Search Strategies: {len(state.search_strategies_generated)}")
+    
     if not state.search_strategies_generated:
         raise ValueError("Missing search strategies")
 
