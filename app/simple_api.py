@@ -228,7 +228,7 @@ async def start_research_stream(request: ResearchRequest):
                         "findings": {
                             "goal_achieved": finding.findings.get("goal_achieved", False),
                             "technologies": finding.findings.get("technologies", []),
-                            "evidence": finding.findings.get("evidence", [])
+                            "evidences": finding.findings.get("evidences", [])
                         }
                     }
                     formatted_results.append(formatted_result)
@@ -349,7 +349,7 @@ async def start_research(request: ResearchRequest):
                     "findings": {
                         "goal_achieved": finding.findings.get("goal_achieved", False),
                         "technologies": finding.findings.get("technologies", []),
-                        "evidence": finding.findings.get("evidence", [])
+                        "evidences": finding.findings.get("evidences", [])
                     }
                 }
                 formatted_results.append(formatted_result)

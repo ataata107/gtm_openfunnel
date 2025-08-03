@@ -89,7 +89,7 @@ Research goal: {research_goal}{quality_feedback}
 
 Generate {num_strategies} diverse search strategies that:
 1. Use different keywords and phrases related to the research goal
-2. Target different information sources (news, company websites, technical blogs, job boards, etc.)
+2. Target different information sources (**news**, company websites, technical blogs, job boards, etc.)
 3. Focus on different aspects (technology, business, implementation, market, etc.)
 4. Use various search techniques (quotes, site-specific, date ranges, etc.)
 5. Target different stakeholders (developers, executives, analysts, customers, etc.)

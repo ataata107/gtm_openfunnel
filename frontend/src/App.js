@@ -11,6 +11,8 @@ function App() {
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
   const [streamingMode, setStreamingMode] = useState(true);
+  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [showEvidenceModal, setShowEvidenceModal] = useState(false);
   const eventSourceRef = useRef(null);
 
   const handleSubmit = async (e) => {
@@ -165,9 +167,19 @@ function App() {
   const stopResearch = () => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
-      setLogs(prev => prev + '⏹️ Research stopped by user\n');
     }
     setIsLoading(false);
+    setLogs(prev => prev + '⏹️ Research stopped by user\n');
+  };
+
+  const handleCompanyClick = (company) => {
+    setSelectedCompany(company);
+    setShowEvidenceModal(true);
+  };
+
+  const closeEvidenceModal = () => {
+    setShowEvidenceModal(false);
+    setSelectedCompany(null);
   };
 
   return (
@@ -326,7 +338,14 @@ function App() {
             <h3>🏢 Companies Found ({results.results.length})</h3>
             <div className="results">
               {results.results.map((company, index) => (
-                <div key={index} className="company-item">
+                <div 
+                  key={index} 
+                  className="company-item"
+                  onClick={() => handleCompanyClick(company)}
+                  style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
+                  onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
+                  onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                >
                   <h4>🏢 {company.domain}</h4>
                   <p><strong>Confidence:</strong> {company.confidence_score.toFixed(2)}</p>
                   <p><strong>Evidence Sources:</strong> {company.evidence_sources}</p>
@@ -335,6 +354,7 @@ function App() {
                   {company.findings.technologies && (
                     <p><strong>Technologies:</strong> {company.findings.technologies.join(', ')}</p>
                   )}
+                  <small style={{ color: '#666', fontStyle: 'italic' }}>Click to view evidence snippets</small>
                 </div>
               ))}
             </div>
@@ -361,6 +381,69 @@ function App() {
               </ul>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Evidence Modal */}
+      {showEvidenceModal && selectedCompany && (
+        <div 
+          className="evidence-modal"
+          onClick={closeEvidenceModal}
+        >
+          <div 
+            className="evidence-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="modal-close-btn"
+              onClick={closeEvidenceModal}
+            >
+              ×
+            </button>
+            
+            <h2>🔍 Evidence for {selectedCompany.domain}</h2>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <p><strong>Confidence Score:</strong> {selectedCompany.confidence_score.toFixed(2)}</p>
+              <p><strong>Evidence Sources:</strong> {selectedCompany.evidence_sources}</p>
+              <p><strong>Signals Found:</strong> {selectedCompany.signals_found}</p>
+              <p><strong>Goal Achieved:</strong> {selectedCompany.findings.goal_achieved ? '✅ Yes' : '❌ No'}</p>
+              {selectedCompany.findings.technologies && (
+                <p><strong>Technologies:</strong> {selectedCompany.findings.technologies.join(', ')}</p>
+              )}
+            </div>
+
+            <div>
+              <h3>📄 Evidence Snippets</h3>
+              {console.log('Selected Company Findings:', selectedCompany.findings)}
+              {selectedCompany.findings.evidences && selectedCompany.findings.evidences.length > 0 ? (
+                <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+                  {selectedCompany.findings.evidences.map((evidence, index) => (
+                    <div 
+                      key={index} 
+                      className="evidence-snippet"
+                    >
+                      <p style={{ margin: 0 }}>
+                        {evidence}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  <p style={{ color: '#666', fontStyle: 'italic' }}>
+                    No evidence snippets available for this company.
+                  </p>
+                  <details style={{ marginTop: '10px', fontSize: '12px', color: '#888' }}>
+                    <summary>Debug: Show findings structure</summary>
+                    <pre style={{ backgroundColor: '#f5f5f5', padding: '10px', borderRadius: '4px', overflow: 'auto' }}>
+                      {JSON.stringify(selectedCompany.findings, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
