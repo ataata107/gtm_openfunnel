@@ -1,6 +1,6 @@
-# 🚀 GTM Research System
+# 🚀 GTM Intelligence System
 
-A sophisticated **Go-To-Market (GTM) research system** built with **LangGraph** and **Large Language Models** to automatically discover, analyze, and evaluate companies based on specific research goals.
+A sophisticated **Go-To-Market (GTM) research system** with **real-time streaming** and **multi-agent orchestration** to automatically discover, analyze, and evaluate companies based on specific research goals.
 
 ## 🎯 **What It Does**
 
@@ -10,16 +10,18 @@ This system automatically:
 - 🧠 **Evaluates quality** using AI-powered assessment
 - 🔄 **Refines strategies** based on gaps and quality metrics
 - 📈 **Provides insights** with confidence scores and recommendations
+- ⚡ **Real-time streaming** of agent logs and progress
+- 🎨 **Modern React UI** for interactive research
 
 ## 🏗️ **Architecture**
 
 ### **Core Components:**
-- **LangGraph Workflow**: Multi-agent orchestration
+- **LangGraph Workflow**: Multi-agent orchestration with feedback loops
 - **LLM Agents**: Specialized AI agents for different tasks
 - **External APIs**: Serper (Google Search), FireCrawl (Web Scraping)
-- **Quality Analysis**: Automated research quality assessment
-- **Strategy Refinement**: Dynamic query generation and optimization
-- **REST API**: Simple synchronous FastAPI endpoints
+- **Real-time Streaming**: Server-Sent Events for live progress updates
+- **React Frontend**: Modern UI with real-time log streaming
+- **REST API**: FastAPI with streaming and synchronous endpoints
 
 ### **Agent Pipeline:**
 
@@ -27,17 +29,8 @@ This system automatically:
 
 ```
 Query Agent → Company Aggregator → Multi-Source Search → 
-Website Scraper → Evaluator → Quality Evaluator → Strategy Refinement
+Website Scraper → Evaluator → Quality Evaluator → (Feedback Loop)
 ```
-
-**Workflow Details:**
-1. **Query Agent**: Generates diverse search strategies using LLM
-2. **Company Aggregator**: Extracts companies from search results
-3. **Multi-Source Search**: Performs parallel web searches
-4. **Website Scraper**: Extracts content from company websites
-5. **Evaluator**: Assesses evidence against research goals
-6. **Quality Evaluator**: Analyzes research coverage and quality
-7. **Strategy Refinement**: Generates improved strategies based on gaps
 
 ## 🚀 **Quick Start**
 
@@ -45,7 +38,7 @@ Website Scraper → Evaluator → Quality Evaluator → Strategy Refinement
 ```bash
 # Clone the repository
 git clone https://github.com/ataata107/gtm_openfunnel.git
-cd OpenFunnel
+cd OpenFunnel/gtm-langgraph
 
 # Create virtual environment
 python -m venv openfunnel
@@ -65,112 +58,107 @@ FIRECRAWL_API_KEY=your_firecrawl_api_key
 
 ### **3. Run the System**
 
-#### **Option A: Direct Execution**
+#### **Option A: API Server + React Frontend**
 ```bash
-cd gtm-langgraph
+# Terminal 1: Start API Server
+source openfunnel/bin/activate
+python app/simple_api.py
+
+# Terminal 2: Start React Frontend
+cd frontend
+npm install
+npm start
+```
+
+Visit `http://localhost:3000` for the interactive UI!
+
+#### **Option B: Direct Execution**
+```bash
 python main.py
 ```
 
-#### **Option B: Simple REST API Server**
+## 🌐 **API Endpoints**
+
+### **Synchronous Research**
 ```bash
-cd gtm-langgraph
-python simple_server.py
-```
-
-The API server will be available at:
-- **API Server**: http://localhost:8001
-- **Interactive Docs**: http://localhost:8001/docs
-- **Health Check**: http://localhost:8001/health
-
-## 🌐 **REST API**
-
-### **Simple Synchronous API**
-
-The system provides a simple, synchronous REST API that directly executes the GTM workflow and returns results.
-
-#### **Quick API Test**
-```bash
-# Test the API
-python tests/test_simple_api.py
-
-# Or use curl
 curl -X POST "http://localhost:8001/research" \
   -H "Content-Type: application/json" \
   -d '{
     "research_goal": "Find fintech companies using AI for fraud detection",
-    "search_depth": "comprehensive",
-    "max_parallel_searches": 20,
+    "search_depth": "quick",
+    "max_parallel_searches": 100,
     "confidence_threshold": 0.8
   }'
 ```
 
-#### **API Endpoints**
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `POST /research` | POST | Start a research (synchronous) |
-| `GET /health` | GET | Health check |
-
-#### **Example Request/Response**
-
-**Request:**
-```json
-{
+### **Real-time Streaming Research**
+```bash
+curl -X POST "http://localhost:8001/research/stream" \
+  -H "Content-Type: application/json" \
+  -d '{
     "research_goal": "Find fintech companies using AI for fraud detection",
-    "search_depth": "comprehensive",
-    "max_parallel_searches": 20,
-    "confidence_threshold": 0.8
-}
+    "search_depth": "quick"
+  }'
 ```
 
-**Response:**
-```json
-{
-    "research_goal": "Find fintech companies using AI for fraud detection",
-    "total_companies": 150,
-    "search_strategies_generated": 12,
-    "total_searches_executed": 1847,
-    "processing_time_ms": 28450,
-    "company_domains": ["stripe.com", "square.com"],
-    "results": [
-        {
-            "domain": "stripe.com",
-            "confidence_score": 0.92,
-            "evidence_sources": 15,
-            "findings": {
-                "ai_fraud_detection": true,
-                "technologies": ["TensorFlow", "scikit-learn"],
-                "evidence": [...],
-                "signals_found": 8
-            },
-            "signals_found": 8
-        }
-    ],
-    "search_performance": {
-        "queries_per_second": 65,
-        "cache_hit_rate": 0.34,
-        "failed_requests": 12
-    },
-    "status": "completed"
-}
+### **Health Check**
+```bash
+curl http://localhost:8001/health
 ```
 
-### **Key Features**
-- ✅ **Synchronous execution**: Direct workflow execution
-- ✅ **Real-time logging**: All workflow steps visible in console
-- ✅ **Simple interface**: Single endpoint for research
-- ✅ **Immediate results**: Complete response when done
-- ✅ **Error handling**: Clear error messages
-- ✅ **Interactive docs**: Auto-generated at `/docs`
+## 🎨 **React Frontend**
+
+### **Features:**
+- ✅ **Real-time streaming** of agent logs
+- ✅ **Interactive research configuration**
+- ✅ **Live progress updates**
+- ✅ **Results visualization**
+- ✅ **Search depth controls**
+- ✅ **Streaming vs Regular mode toggle**
+
+### **Usage:**
+1. Navigate to `http://localhost:3000`
+2. Enter your research goal
+3. Select search depth (quick/standard/comprehensive)
+4. Choose streaming mode for real-time logs
+5. Click "🚀 Start Research"
+6. Watch real-time agent progress!
 
 ## 📊 **Example Output**
 
-The system generates comprehensive research findings:
+### **Real-time Streaming Logs:**
+```
+📊 Starting research...
+🎯 QUERY AGENT: Generating 8 focused search strategies
+🔍 Building queries for 38 companies...
+⏱️ Query generation took: 1234.56ms
+🏢 Found company: stripe.com
+📊 Processing search results...
+✅ Research completed!
+```
 
-- **Company Discovery**: 13+ companies found
-- **Quality Scores**: 84% coverage and quality
-- **Evidence Analysis**: Multiple sources per company
-- **Strategy Refinement**: 5 refined strategies with 20+ queries
+### **Final Results:**
+```json
+{
+  "total_companies": 45,
+  "search_strategies_generated": 8,
+  "processing_time_ms": 28450,
+  "quality_metrics": {
+    "quality_score": 0.84,
+    "coverage_score": 0.76
+  },
+  "results": [
+    {
+      "domain": "stripe.com",
+      "confidence_score": 0.92,
+      "findings": {
+        "goal_achieved": true,
+        "technologies": ["AI", "Machine Learning"]
+      }
+    }
+  ]
+}
+```
 
 ## 🛠️ **Key Features**
 
@@ -181,7 +169,12 @@ The system generates comprehensive research findings:
 - **Website Scraper**: Extracts relevant content from company sites
 - **Evaluator**: Assesses evidence against research goals
 - **Quality Evaluator**: Analyzes research coverage and quality
-- **Strategy Refinement**: Generates improved search strategies
+
+### **⚡ Real-time Streaming**
+- **Live Agent Logs**: See agent progress in real-time
+- **Server-Sent Events**: Efficient streaming protocol
+- **React Integration**: Modern UI with live updates
+- **Progress Tracking**: Real-time status updates
 
 ### **📈 Performance Optimization**
 - **Async Processing**: Parallel API calls and LLM operations
@@ -195,34 +188,32 @@ The system generates comprehensive research findings:
 - **Gap Identification**: Finds missing information
 - **Strategy Refinement**: Improves search effectiveness
 
-### **🌐 REST API Features**
-- **Synchronous Processing**: Direct workflow execution
-- **Real-time Logging**: Console output for all steps
-- **Simple Interface**: Single endpoint for research
-- **Performance Metrics**: Comprehensive analytics
-- **Interactive Documentation**: Auto-generated API docs
-
 ## 📁 **Project Structure**
 
 ```
-OpenFunnel/
-├── gtm-langgraph/
-│   ├── agents/           # AI agent implementations
-│   ├── graph/           # LangGraph workflow definition
-│   ├── utils/           # Utility functions
-│   ├── app/             # API endpoints
-│   │   ├── api.py       # Complex async API (optional)
-│   │   └── simple_api.py # Simple synchronous API
-│   ├── tests/           # Test files
-│   │   ├── test_simple_api.py
-│   │   ├── test_api.py
-│   │   ├── test_api_simple.py
-│   │   └── test_logs.py
-│   ├── prompts/         # LLM prompts
-│   ├── simple_server.py # Simple API server startup
-│   ├── server.py        # Complex API server startup
-│   ├── gtm_graph.png    # Workflow visualization
-│   └── API_README.md    # Detailed API documentation
+gtm-langgraph/
+├── agents/              # AI agent implementations
+│   ├── query_agent.py
+│   ├── company_aggregator_agent.py
+│   ├── multi_source_search_agent.py
+│   ├── website_scraper_agent.py
+│   ├── evaluator_agent.py
+│   └── quality_evaluator_agent.py
+├── graph/              # LangGraph workflow
+│   ├── gtm_graph.py
+│   └── state.py
+├── app/                # API endpoints
+│   └── simple_api.py   # FastAPI with streaming
+├── frontend/           # React application
+│   ├── src/
+│   │   ├── App.js
+│   │   └── components/
+│   └── package.json
+├── utils/              # Utility functions
+├── tests/              # Test files
+├── prompts/            # LLM prompts
+├── main.py            # Direct execution
+└── requirements.txt    # Dependencies
 ```
 
 ## 🧪 **Testing**
@@ -232,70 +223,70 @@ OpenFunnel/
 python main.py
 ```
 
-### **Test the Simple API**
+### **Test the API**
 ```bash
 # Start the server
-python simple_server.py
+python app/simple_api.py
 
-# In another terminal, test the API
-python tests/test_simple_api.py
+# Test with curl
+curl -X POST "http://localhost:8001/research" \
+  -H "Content-Type: application/json" \
+  -d '{"research_goal": "Find AI companies", "search_depth": "quick"}'
 ```
 
-### **Run All Tests**
+### **Test the React Frontend**
 ```bash
-# Run individual test files
-python tests/test_simple_api.py
-python tests/test_api_simple.py
-python tests/test_logs.py
+cd frontend
+npm start
+# Visit http://localhost:3000
 ```
-
-### **Interactive API Testing**
-Visit http://localhost:8001/docs for interactive API documentation and testing.
 
 ## 📈 **Performance Metrics**
-
-The system achieves impressive performance:
 
 - **Processing Speed**: Sub-30 second response times
 - **Parallel Processing**: 50+ companies simultaneously
 - **Search Throughput**: 65+ queries per second
 - **Quality Scores**: 85%+ confidence thresholds
-- **Coverage**: Comprehensive multi-source analysis
+- **Real-time Streaming**: Live agent progress updates
 
 ## 🔧 **Configuration**
 
 ### **Search Depth Options**
-- **quick**: Fast search with minimal depth
-- **standard**: Balanced search depth and speed
-- **comprehensive**: Deep search with maximum coverage
+- **quick**: Fast search with minimal depth (~50 companies)
+- **standard**: Balanced search depth and speed (~100 companies)
+- **comprehensive**: Deep search with maximum coverage (~200 companies)
 
-### **Performance Tuning**
-- **max_parallel_searches**: Control concurrent operations
-- **confidence_threshold**: Set quality requirements
-- **max_iterations**: Limit research cycles
+### **API Parameters**
+- **max_parallel_searches**: Control concurrent operations (default: 100)
+- **confidence_threshold**: Set quality requirements (default: 0.8)
+- **max_iterations**: Limit research cycles (default: 1)
 
 ## 🚀 **Deployment**
 
 ### **Development**
 ```bash
-python simple_server.py
+# API Server
+python app/simple_api.py
+
+# React Frontend
+cd frontend && npm start
 ```
 
 ### **Production**
 ```bash
-# Use gunicorn for production
-gunicorn app.simple_api:app -w 4 -k uvicorn.workers.UvicornWorker
-
-# Or use uvicorn directly
+# API Server
 uvicorn app.simple_api:app --host 0.0.0.0 --port 8001
+
+# React Frontend
+cd frontend && npm run build
 ```
 
 ## 📚 **Documentation**
 
-- **[API Documentation](API_README.md)**: Complete REST API guide
+- **[API Documentation](docs/API.md)**: Complete REST API guide
+- **[Streaming Guide](docs/STREAMING_GUIDE.md)**: Real-time streaming documentation
 - **[Agent Documentation](agents/)**: Individual agent implementations
 - **[Graph Documentation](graph/)**: LangGraph workflow details
-- **[Test Documentation](tests/)**: Comprehensive test suite
 
 ## 🤝 **Contributing**
 
@@ -311,4 +302,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**Built with ❤️ using LangGraph, LangChain, and OpenAI** 
+**Built with ❤️ using LangGraph, LangChain, OpenAI, FastAPI, and React** 
