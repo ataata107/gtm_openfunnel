@@ -39,7 +39,7 @@ app.add_middleware(
 class ResearchRequest(BaseModel):
     research_goal: str
     search_depth: str = "standard"
-    max_parallel_searches: int = 100
+    max_parallel_searches: int = 200
     confidence_threshold: float = 0.8
     max_iterations: int = 1
 

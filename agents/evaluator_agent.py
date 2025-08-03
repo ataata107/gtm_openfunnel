@@ -168,9 +168,9 @@ def evaluator_agent(state: GTMState) -> GTMState:
             }
             findings_data.append(finding_dict)
         
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(findings_data, f, ensure_ascii=False, indent=2)
-        print(f"📁 Saved final findings to {output_path}")
+        # with open(output_path, "w", encoding="utf-8") as f:
+        #     json.dump(findings_data, f, ensure_ascii=False, indent=2)
+        # print(f"📁 Saved final findings to {output_path}")
     except Exception as e:
         print(f"⚠️ Failed to write final findings: {e}")
 

@@ -282,12 +282,12 @@ def multi_source_search_agent(state: GTMState) -> GTMState:
     # ✅ Save to disk for debugging
     os.makedirs("debug_output", exist_ok=True)
     output_path = os.path.join("debug_output", "serper_search_output.json")
-    try:
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(serper_results, f, ensure_ascii=False, indent=2)
-        print(f"📁 Saved Serper search results to {output_path}")
-    except Exception as e:
-        print(f"⚠️ Failed to write Serper search results: {e}")
+    # try:
+    #     with open(output_path, "w", encoding="utf-8") as f:
+    #         json.dump(serper_results, f, ensure_ascii=False, indent=2)
+    #     print(f"📁 Saved Serper search results to {output_path}")
+    # except Exception as e:
+    #     print(f"⚠️ Failed to write Serper search results: {e}")
 
     # Increment iteration count for feedback loop tracking
     new_iteration_count = state.iteration_count + 1

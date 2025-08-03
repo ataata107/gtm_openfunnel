@@ -46,7 +46,7 @@ function App() {
         body: JSON.stringify({
           research_goal: researchGoal,
           search_depth: searchDepth,
-          max_parallel_searches: 100,
+          max_parallel_searches: 150,
           confidence_threshold: 0.8,
           max_iterations: 1
         })

@@ -232,11 +232,11 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
     # ✅ Save to disk for debugging
     os.makedirs("debug_output", exist_ok=True)
     output_path = os.path.join("debug_output", "extracted_companies.json")
-    try:
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump([c.dict() for c in extracted_companies], f, ensure_ascii=False, indent=2)
-        print(f"📁 Saved extracted companies to {output_path}")
-    except Exception as e:
-        print(f"⚠️ Failed to write extracted companies: {e}")
+    # try:
+    #     with open(output_path, "w", encoding="utf-8") as f:
+    #         json.dump([c.dict() for c in extracted_companies], f, ensure_ascii=False, indent=2)
+    #     print(f"📁 Saved extracted companies to {output_path}")
+    # except Exception as e:
+    #     print(f"⚠️ Failed to write extracted companies: {e}")
 
     return state.model_copy(update={"extracted_companies": extracted_companies})

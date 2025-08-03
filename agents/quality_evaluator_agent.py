@@ -277,12 +277,12 @@ def quality_evaluator_agent(state: GTMState) -> GTMState:
         # Save analysis to debug output
         os.makedirs("debug_output", exist_ok=True)
         output_path = os.path.join("debug_output", "quality_analysis.json")
-        try:
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(analysis.model_dump(), f, ensure_ascii=False, indent=2)
-            print(f"📁 Saved quality analysis to {output_path}")
-        except Exception as e:
-            print(f"⚠️ Failed to write quality analysis: {e}")
+        # try:
+        #     with open(output_path, "w", encoding="utf-8") as f:
+        #         json.dump(analysis.model_dump(), f, ensure_ascii=False, indent=2)
+        #     print(f"📁 Saved quality analysis to {output_path}")
+        # except Exception as e:
+        #     print(f"⚠️ Failed to write quality analysis: {e}")
         
         # Update state with quality metrics
         quality_metrics = {
