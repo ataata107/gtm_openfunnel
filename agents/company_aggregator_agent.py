@@ -20,7 +20,7 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 class ExtractedCompany(BaseModel):
     name: str = Field(..., description="Company name")
     domain: str = Field(..., description="Company domain (e.g., stripe.com)")
-    source_url: str = Field(..., description="The URL where the company was found")
+    #source_url: str = Field(..., description="The URL where the company was found")
 
 class CompanyExtractionOutput(BaseModel):
     companies: List[ExtractedCompany]
@@ -59,9 +59,8 @@ Extraction guidelines:
 Return a list of companies with:
 - Company name (use the most common/recent name)
 - Domain (e.g., stripe.com, company.com)
-- The source URL where it was mentioned
 
-Only return a list of Pydantic models with the fields: name, domain, source_url.
+Only return a list of Pydantic models with the fields: name, domain.
 
 Raw search result:
 {search_result}

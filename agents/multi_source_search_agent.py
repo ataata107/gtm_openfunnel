@@ -21,7 +21,7 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 class SearchQueriesOutput(BaseModel):
     queries: List[str] = Field(..., description="List of 3-5 highly targeted search queries for finding evidence about the company")
     reasoning: str = Field(..., description="Brief explanation of why these queries were chosen")
-    search_focus: str = Field(..., description="Primary focus area for these queries (e.g., 'case studies', 'technical details', 'user reviews')")
+    #search_focus: str = Field(..., description="Primary focus area for these queries (e.g., 'case studies', 'technical details', 'user reviews')")
 
 # LLM-based query builder with structured output
 class LLMQueryBuilder:
@@ -52,7 +52,6 @@ Instructions:
 Return a structured response with:
 - queries: List of 3-5 search queries with company name in the queries
 - reasoning: Brief explanation of your query strategy
-- search_focus: Primary focus area for these queries
 """)
 
     async def build_queries_async(self, company_name: str, domain: str, research_goal: str, quality_metrics: dict = None) -> List[str]:
