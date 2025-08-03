@@ -19,6 +19,7 @@ class QueryStrategyOutput(BaseModel):
 def query_agent(state: GTMState) -> GTMState:
     logger.info("🔍 QUERY AGENT: Starting search strategy generation...")
     logger.info(f"📋 Research Goal: {state.research_goal}")
+    logger.info(f"🎯 Search Depth: {state.search_depth}")
     
     # Check if we have quality metrics from previous iteration
     quality_metrics = state.quality_metrics or {}
@@ -28,6 +29,18 @@ def query_agent(state: GTMState) -> GTMState:
         logger.info("🎯 QUERY AGENT: Using quality metrics to improve search strategies")
         logger.info(f"📊 Previous Quality Score: {quality_metrics.get('quality_score', 0):.2f}")
         logger.info(f"📊 Previous Coverage Score: {quality_metrics.get('coverage_score', 0):.2f}")
+    
+    # Configure search depth
+    SEARCH_DEPTH_CONFIGS = {
+        "quick": {"strategies": 8, "description": "8 focused search strategies"},
+        "standard": {"strategies": 15, "description": "15 diverse search strategies"},
+        "comprehensive": {"strategies": 25, "description": "25 comprehensive search strategies"}
+    }
+    
+    config = SEARCH_DEPTH_CONFIGS.get(state.search_depth, SEARCH_DEPTH_CONFIGS["standard"])
+    num_strategies = config["strategies"]
+    
+    logger.info(f"🎯 QUERY AGENT: Generating {config['description']}")
     
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
     structured_llm = llm.with_structured_output(QueryStrategyOutput)
@@ -70,11 +83,11 @@ IMPORTANT: Use this quality feedback to generate more targeted search strategies
     prompt = PromptTemplate.from_template(
         """You are a research strategist specializing in web search optimization.
 
-Your task is to generate 10 different search strategies for the following research goal. Each strategy should restructure the research goal in a unique way to find different types of information.
+Your task is to generate {num_strategies} different search strategies for the following research goal. Each strategy should restructure the research goal in a unique way to find different types of information.
 
 Research goal: {research_goal}{quality_feedback}
 
-Generate 10 diverse search strategies that:
+Generate {num_strategies} diverse search strategies that:
 1. Use different keywords and phrases related to the research goal
 2. Target different information sources (news, company websites, technical blogs, job boards, etc.)
 3. Focus on different aspects (technology, business, implementation, market, etc.)
@@ -104,7 +117,7 @@ Examples of strategy types (adapt these to your specific research goal):
 - Case study-focused: Look for success stories, case studies, or examples
 - Competitive-focused: Search for market leaders, competitors, or industry analysis
 
-Return exactly 10 search strategies as the 'search_strategies_generated' field of a Pydantic model. 
+Return exactly {num_strategies} search strategies as the 'search_strategies_generated' field of a Pydantic model. 
 """
     )
 
@@ -126,7 +139,8 @@ IMPORTANT QUALITY-DRIVEN GUIDELINES:
     input_text = prompt.format(
         research_goal=state.research_goal,
         quality_feedback=quality_feedback_text,
-        quality_guidance=quality_guidance
+        quality_guidance=quality_guidance,
+        num_strategies=num_strategies
     )
     
     logger.info("🤖 QUERY AGENT: Invoking LLM for strategy generation...")

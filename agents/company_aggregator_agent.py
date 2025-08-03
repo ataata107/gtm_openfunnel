@@ -37,7 +37,7 @@ Your goal: Extract distinct companies relevant to the following research objecti
 
 Research Goal: {research_goal}
 
-Given the following raw text from a search engine result, extract all **unique companies** that match the research goal.
+Given the following raw text from a search engine result, extract all **unique companies** that match the research goal.Try to extract as many companies as possible.
 
 Consider the research goal holistically - it could be about:
 - Technology adoption (e.g., AI, blockchain, cloud computing)
@@ -75,14 +75,24 @@ Raw search result:
         )
         return self.structured_llm.invoke(input_text).companies
 
-async def run_serper(query: str, sem: asyncio.Semaphore):
+async def run_serper(query: str, sem: asyncio.Semaphore, search_depth: str = "standard"):
     async with sem:
         try:
             url = "https://google.serper.dev/search"
             
+            # Configure search depth
+            SEARCH_DEPTH_CONFIGS = {
+                "quick": {"num_results": 15, "description": "15 results per search"},
+                "standard": {"num_results": 20, "description": "20 results per search"},
+                "comprehensive": {"num_results": 30, "description": "30 results per search"}
+            }
+            
+            config = SEARCH_DEPTH_CONFIGS.get(search_depth, SEARCH_DEPTH_CONFIGS["standard"])
+            num_results = config["num_results"]
+            
             payload = json.dumps({
                 "q": query,
-                "num": 20
+                "num": num_results
             })
             
             headers = {
@@ -119,6 +129,7 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
     logger.info("🏢 COMPANY AGGREGATOR: Starting company extraction...")
     logger.info(f"📋 Research Goal: {state.research_goal}")
     logger.info(f"🔍 Search Strategies: {len(state.search_strategies_generated)}")
+    logger.info(f"🎯 Search Depth: {state.search_depth}")
     
     if not state.search_strategies_generated:
         raise ValueError("Missing search strategies")
@@ -127,7 +138,7 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
         raise ValueError("SERPER_API_KEY not found in environment variables")
 
     async def run_all(sem: asyncio.Semaphore):
-        tasks = [run_serper(q, sem) for q in state.search_strategies_generated]
+        tasks = [run_serper(q, sem, state.search_depth) for q in state.search_strategies_generated]
         return await asyncio.gather(*tasks)
 
     print("🔍 Running Serper and extracting companies using GPT-4o-mini...")
@@ -158,6 +169,18 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
     async def extract_companies_async():
         sem = asyncio.Semaphore(state.max_parallel_searches)  # Limit concurrent LLM calls
         
+        # Configure company limits based on search depth
+        SEARCH_DEPTH_CONFIGS = {
+            "quick": {"max_companies": 50, "description": "50 companies max"},
+            "standard": {"max_companies": 100, "description": "100 companies max"},
+            "comprehensive": {"max_companies": 200, "description": "200 companies max"}
+        }
+        
+        config = SEARCH_DEPTH_CONFIGS.get(state.search_depth, SEARCH_DEPTH_CONFIGS["standard"])
+        max_companies = config["max_companies"]
+        
+        logger.info(f"🎯 COMPANY AGGREGATOR: Targeting {config['description']}")
+        
         async def extract_single_result(result):
             async with sem:
                 if isinstance(result, str) and result.startswith("Error:"):
@@ -187,6 +210,14 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
                 if company.domain not in seen_domains:
                     seen_domains.add(company.domain)
                     extracted_companies.append(CompanyMeta(**company.dict()))
+                    
+                    # Stop if we've reached the company limit
+                    if len(extracted_companies) >= max_companies:
+                        logger.info(f"🎯 COMPANY AGGREGATOR: Reached company limit ({max_companies})")
+                        break
+            # Stop if we've reached the company limit
+            if len(extracted_companies) >= max_companies:
+                break
 
     # Run the async extraction
     asyncio.run(extract_companies_async())

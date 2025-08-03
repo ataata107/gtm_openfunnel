@@ -3,6 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
 import time
+import sys
+import os
+
+# Add the parent directory to the path so we can import our modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from graph.gtm_graph import build_gtm_graph
 from graph.state import GTMState
@@ -26,19 +31,21 @@ app.add_middleware(
 # Pydantic models for API requests/responses
 class ResearchRequest(BaseModel):
     research_goal: str = Field(..., description="High-level goal of the research")
-    search_depth: str = Field(default="standard", description="quick | standard | comprehensive")
-    max_parallel_searches: int = Field(default=20, description="Number of parallel search executions")
+    search_depth: str = Field(default="quick", description="quick | standard | comprehensive")
+    max_parallel_searches: int = Field(default=100, description="Number of parallel search executions")
     confidence_threshold: float = Field(default=0.8, description="Minimum acceptable confidence")
-    max_iterations: int = Field(default=3, description="Maximum research iterations")
+    max_iterations: int = Field(default=1, description="Maximum research iterations")
 
 class ResearchResponse(BaseModel):
     research_goal: str
+    search_depth: str
     total_companies: int
     search_strategies_generated: int
     total_searches_executed: int
     processing_time_ms: int
     company_domains: list
     results: list
+    quality_metrics: dict
     search_performance: dict
     status: str
 
@@ -76,11 +83,13 @@ def start_research(request: ResearchRequest):
             companies = final_state.get("extracted_companies", [])
             findings = final_state.get("final_findings", [])
             performance = final_state.get("performance", {})
+            quality_metrics = final_state.get("quality_metrics", {})
         else:
             search_strategies = getattr(final_state, "search_strategies_generated", [])
             companies = getattr(final_state, "extracted_companies", [])
             findings = getattr(final_state, "final_findings", [])
             performance = getattr(final_state, "performance", {})
+            quality_metrics = getattr(final_state, "quality_metrics", {})
         
         # Calculate metrics
         total_companies = len(companies) if companies else 0
@@ -120,17 +129,32 @@ def start_research(request: ResearchRequest):
             "failed_requests": performance.get("failed_requests", 0)
         }
         
+        # Extract quality metrics
+        quality_metrics_response = {
+            "quality_score": quality_metrics.get("quality_score", 0),
+            "coverage_score": quality_metrics.get("coverage_score", 0),
+            "missing_aspects": quality_metrics.get("missing_aspects", []),
+            "coverage_gaps": quality_metrics.get("coverage_gaps", []),
+            "evidence_issues": quality_metrics.get("evidence_issues", []),
+            "recommendations": quality_metrics.get("recommendations", [])
+        }
+        
         print(f"✅ Research completed in {processing_time_ms}ms")
         print(f"📊 Found {total_companies} companies, {search_strategies_count} strategies")
+        print(f"🎯 Search Depth: {request.search_depth}")
+        print(f"📈 Quality Score: {quality_metrics_response['quality_score']:.2f}")
+        print(f"📈 Coverage Score: {quality_metrics_response['coverage_score']:.2f}")
         
         return ResearchResponse(
             research_goal=request.research_goal,
+            search_depth=request.search_depth,
             total_companies=total_companies,
             search_strategies_generated=search_strategies_count,
             total_searches_executed=total_searches,
             processing_time_ms=processing_time_ms,
             company_domains=company_domains,
             results=formatted_results,
+            quality_metrics=quality_metrics_response,
             search_performance=search_performance,
             status="completed"
         )

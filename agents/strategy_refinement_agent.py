@@ -117,7 +117,7 @@ Focus on actionable, specific strategies that directly address the identified ga
         
         # Prepare current strategies text
         current_strategies = state.search_strategies_generated or []
-        current_strategies_text = "\n".join([f"- {strategy}" for strategy in current_strategies[:10]])
+        current_strategies_text = "\n".join([f"- {strategy}" for strategy in current_strategies[:15]])
         
         # Calculate metrics
         companies_analyzed = len(state.final_findings or [])

@@ -183,10 +183,10 @@ Return a structured analysis with:
         
         # Prepare company analyses text for aggregation
         company_analyses_text = ""
-        for analysis in company_analyses:
+        for analysis in company_analyses[:15]:
             # Convert lists to readable string format
-            gaps_text = "\n".join([f"  * {gap}" for gap in analysis.gaps[:2]]) if analysis.gaps else "None identified"
-            issues_text = "\n".join([f"  * {issue}" for issue in analysis.evidence_issues[:2]]) if analysis.evidence_issues else "None identified"
+            gaps_text = "\n".join([f"  * {gap}" for gap in analysis.gaps[:1]]) if analysis.gaps else "None identified"
+            issues_text = "\n".join([f"  * {issue}" for issue in analysis.evidence_issues[:1]]) if analysis.evidence_issues else "None identified"
             
             company_analyses_text += f"""
             Company: {analysis.company_domain}
