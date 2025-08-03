@@ -30,7 +30,6 @@ class CoverageAnalysis(BaseModel):
     quality_score: float = Field(..., description="Overall evidence quality score (0-1)")
     evidence_issues: List[str] = Field(..., description="Issues with evidence quality")
     recommendations: List[str] = Field(..., description="Recommendations for improvement")
-    company_analyses: List[CompanyQualityAnalysis] = Field(..., description="Individual company analyses")
 
 class CompanyQualityEvaluator:
     def __init__(self):
@@ -142,7 +141,6 @@ Return a structured analysis with:
 - quality_score: 0-1 score of evidence quality
 - evidence_issues: Problems with current evidence
 - recommendations: Specific actions to improve research
-- company_analyses: List of individual company analyses
 """
         )
 
@@ -219,7 +217,7 @@ Return a structured analysis with:
         print(f"⏱️  Aggregation analysis took: {aggregation_duration:.2f}ms ({aggregation_duration/1000:.2f}s)")
         
         # Add company analyses to the result
-        overall_analysis.company_analyses = company_analyses
+        object.__setattr__(overall_analysis, 'company_analyses', company_analyses)
         
         return overall_analysis
 

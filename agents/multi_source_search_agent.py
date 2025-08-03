@@ -165,7 +165,7 @@ async def _make_serper_request(query: str) -> List[str]:
     """Make Serper API request using requests"""
     url = "https://google.serper.dev/search"
     headers = {"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"}
-    payload = {"q": query, "num": 20}
+    payload = {"q": query, "num": 10}
     
     # Use asyncio.to_thread for synchronous requests - same as company_aggregator_agent
     response = await asyncio.to_thread(
