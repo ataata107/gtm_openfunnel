@@ -94,15 +94,25 @@ Focus on actionable, specific strategies that directly address the identified ga
         recommendations = quality_metrics.get('recommendations', [])
         company_analyses = quality_metrics.get('company_analyses', [])
         
+        # Convert lists to readable string format
+        missing_aspects_text = "\n".join([f"- {aspect}" for aspect in missing_aspects]) if missing_aspects else "None identified"
+        coverage_gaps_text = "\n".join([f"- {gap}" for gap in coverage_gaps]) if coverage_gaps else "None identified"
+        evidence_issues_text = "\n".join([f"- {issue}" for issue in evidence_issues]) if evidence_issues else "None identified"
+        recommendations_text = "\n".join([f"- {rec}" for rec in recommendations]) if recommendations else "None provided"
+        
         # Prepare company analysis text
         company_analyses_text = ""
         if company_analyses:
             for analysis in company_analyses[:5]:  # Show first 5 for brevity
+                gaps = analysis.get('gaps', [])
+                gaps_text = "\n".join([f"  * {gap}" for gap in gaps[:3]]) if gaps else "None identified"
+                
                 company_analyses_text += f"""
                 Company: {analysis.get('company_domain', 'N/A')}
                 Quality: {analysis.get('quality_score', 0):.2f}
                 Coverage: {analysis.get('coverage_score', 0):.2f}
-                Gaps: {analysis.get('gaps', [])}
+                Gaps:
+                {gaps_text}
                 """
         
         # Prepare current strategies text
@@ -120,10 +130,10 @@ Focus on actionable, specific strategies that directly address the identified ga
             companies_analyzed=companies_analyzed,
             avg_quality_score=round(avg_quality_score, 2),
             avg_coverage_score=round(avg_coverage_score, 2),
-            missing_aspects=missing_aspects,
-            coverage_gaps=coverage_gaps,
-            evidence_issues=evidence_issues,
-            recommendations=recommendations,
+            missing_aspects=missing_aspects_text,
+            coverage_gaps=coverage_gaps_text,
+            evidence_issues=evidence_issues_text,
+            recommendations=recommendations_text,
             company_analyses=company_analyses_text,
             current_strategies=current_strategies_text
         )

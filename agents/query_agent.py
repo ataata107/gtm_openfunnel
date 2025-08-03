@@ -20,15 +20,59 @@ def query_agent(state: GTMState) -> GTMState:
     logger.info("🔍 QUERY AGENT: Starting search strategy generation...")
     logger.info(f"📋 Research Goal: {state.research_goal}")
     
+    # Check if we have quality metrics from previous iteration
+    quality_metrics = state.quality_metrics or {}
+    has_quality_feedback = bool(quality_metrics)
+    
+    if has_quality_feedback:
+        logger.info("🎯 QUERY AGENT: Using quality metrics to improve search strategies")
+        logger.info(f"📊 Previous Quality Score: {quality_metrics.get('quality_score', 0):.2f}")
+        logger.info(f"📊 Previous Coverage Score: {quality_metrics.get('coverage_score', 0):.2f}")
+    
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
     structured_llm = llm.with_structured_output(QueryStrategyOutput)
+
+    # Prepare quality feedback text if available
+    quality_feedback_text = ""
+    if has_quality_feedback:
+        missing_aspects = quality_metrics.get('missing_aspects', [])
+        coverage_gaps = quality_metrics.get('coverage_gaps', [])
+        evidence_issues = quality_metrics.get('evidence_issues', [])
+        recommendations = quality_metrics.get('recommendations', [])
+        
+        # Convert lists to readable format
+        missing_aspects_text = "\n".join([f"- {aspect}" for aspect in missing_aspects]) if missing_aspects else "None identified"
+        coverage_gaps_text = "\n".join([f"- {gap}" for gap in coverage_gaps]) if coverage_gaps else "None identified"
+        evidence_issues_text = "\n".join([f"- {issue}" for issue in evidence_issues]) if evidence_issues else "None identified"
+        recommendations_text = "\n".join([f"- {rec}" for rec in recommendations]) if recommendations else "None provided"
+        
+        quality_feedback_text = f"""
+
+PREVIOUS RESEARCH QUALITY ANALYSIS:
+Quality Score: {quality_metrics.get('quality_score', 0):.2f}/1.0
+Coverage Score: {quality_metrics.get('coverage_score', 0):.2f}/1.0
+
+MISSING ASPECTS FROM PREVIOUS RESEARCH:
+{missing_aspects_text}
+
+COVERAGE GAPS FROM PREVIOUS RESEARCH:
+{coverage_gaps_text}
+
+EVIDENCE ISSUES FROM PREVIOUS RESEARCH:
+{evidence_issues_text}
+
+RECOMMENDATIONS FROM THIS RESEARCH:
+{recommendations_text}
+
+IMPORTANT: Use this quality feedback to generate more targeted search strategies that address the specific gaps and issues identified above.
+"""
 
     prompt = PromptTemplate.from_template(
         """You are a research strategist specializing in web search optimization.
 
 Your task is to generate 10 different search strategies for the following research goal. Each strategy should restructure the research goal in a unique way to find different types of information.
 
-Research goal: {research_goal}
+Research goal: {research_goal}{quality_feedback}
 
 Generate 10 diverse search strategies that:
 1. Use different keywords and phrases related to the research goal
@@ -46,6 +90,8 @@ Strategy generation guidelines:
 - Consider different time periods and contexts
 - Include both technical and business perspectives
 
+{quality_guidance}
+
 Examples of strategy types (adapt these to your specific research goal):
 - Technology-focused: Focus on specific technologies, tools, or technical implementations
 - Company-focused: Target specific companies or competitors
@@ -62,12 +108,32 @@ Return exactly 10 search strategies as the 'search_strategies_generated' field o
 """
     )
 
-    input_text = prompt.format(research_goal=state.research_goal)
+    # Prepare quality guidance based on whether we have feedback
+    if has_quality_feedback:
+        quality_guidance = """
+IMPORTANT QUALITY-DRIVEN GUIDELINES:
+- Focus on strategies that address the specific missing aspects identified
+- Prioritize searches that target the coverage gaps mentioned
+- Generate strategies that use more reliable data sources (address evidence issues)
+- Include strategies that follow the recommendations from previous research
+- If quality score was low, focus on more specific and targeted searches
+- If coverage score was low, focus on broader and more diverse searches
+- If evidence issues were identified, prioritize searches for recent, specific, and well-documented information
+"""
+    else:
+        quality_guidance = ""
+
+    input_text = prompt.format(
+        research_goal=state.research_goal,
+        quality_feedback=quality_feedback_text,
+        quality_guidance=quality_guidance
+    )
+    
     logger.info("🤖 QUERY AGENT: Invoking LLM for strategy generation...")
     response: QueryStrategyOutput = structured_llm.invoke(input_text)
 
     logger.info(f"✅ QUERY AGENT: Generated {len(response.search_strategies_generated)} search strategies")
-    # for i, strategy in enumerate(response.search_strategies_generated, 1):
-    #     logger.info(f"   {i}. {strategy}")
-
+    if has_quality_feedback:
+        logger.info("🎯 QUERY AGENT: Strategies generated with quality feedback integration")
+    
     return state.model_copy(update={"search_strategies_generated": response.search_strategies_generated})

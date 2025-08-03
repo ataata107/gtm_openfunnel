@@ -1,198 +1,281 @@
 #!/usr/bin/env python3
 """
-Test script for quality_evaluator_agent performance
+Test for quality evaluator agent functionality
 """
 
 import sys
 import os
-import time
-import json
-import asyncio
-from dotenv import load_dotenv
-
-# Add the parent directory to the path so we can import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from agents.quality_evaluator_agent import CompanyQualityEvaluator, QualityEvaluator, CompanyQualityAnalysis, CoverageAnalysis
 from graph.state import GTMState, CompanyFinding
-from agents.quality_evaluator_agent import quality_evaluator_agent
+from typing import List, Dict, Any
+import asyncio
 
-load_dotenv()
+def create_mock_finding(domain: str, confidence_score: float, evidence_sources: int, goal_achieved: bool, technologies: List[str], evidences: List[str]) -> CompanyFinding:
+    """Create a mock company finding for testing"""
+    return CompanyFinding(
+        domain=domain,
+        confidence_score=confidence_score,
+        evidence_sources=evidence_sources,
+        findings={
+            "goal_achieved": goal_achieved,
+            "technologies": technologies,
+            "evidences": evidences,
+            "confidence_level": "High" if confidence_score > 0.8 else "Medium" if confidence_score > 0.5 else "Low"
+        },
+        signals_found=len(evidences)
+    )
 
-def create_test_state():
-    """Create a test state with sample findings"""
+def create_mock_state(research_goal: str, findings: List[CompanyFinding]) -> GTMState:
+    """Create a mock state for testing"""
+    return GTMState(
+        research_goal=research_goal,
+        search_depth="comprehensive",
+        max_parallel_searches=5,
+        confidence_threshold=0.8,
+        final_findings=findings
+    )
+
+async def test_company_quality_evaluator():
+    """Test individual company quality evaluation"""
+    print("🧪 Testing Company Quality Evaluator")
+    print("=" * 50)
     
-    # Sample findings from evaluator agent
+    evaluator = CompanyQualityEvaluator()
+    
+    # Test case 1: High quality company
+    high_quality_finding = create_mock_finding(
+        domain="stripe.com",
+        confidence_score=0.92,
+        evidence_sources=15,
+        goal_achieved=True,
+        technologies=["TensorFlow", "scikit-learn", "machine learning"],
+        evidences=[
+            "Stripe uses advanced machine learning for fraud detection",
+            "AI-powered risk assessment system processes millions of transactions",
+            "Real-time fraud detection with 99.9% accuracy",
+            "Machine learning models trained on billions of transactions"
+        ]
+    )
+    
+    print("\n📋 Test Case 1: High Quality Company (Stripe)")
+    try:
+        result = await evaluator.evaluate_single_company(high_quality_finding, "Find fintech companies using AI for fraud detection")
+        print(f"✅ Quality Score: {result.quality_score:.2f}")
+        print(f"✅ Coverage Score: {result.coverage_score:.2f}")
+        print(f"✅ Gaps: {result.gaps}")
+        print(f"✅ Issues: {result.evidence_issues}")
+        print(f"✅ Recommendations: {result.recommendations}")
+    except Exception as e:
+        print(f"❌ Failed: {e}")
+    
+    # Test case 2: Medium quality company
+    medium_quality_finding = create_mock_finding(
+        domain="square.com",
+        confidence_score=0.65,
+        evidence_sources=8,
+        goal_achieved=True,
+        technologies=["AI", "data analytics"],
+        evidences=[
+            "Square uses AI for payment processing",
+            "Advanced analytics for business insights"
+        ]
+    )
+    
+    print("\n📋 Test Case 2: Medium Quality Company (Square)")
+    try:
+        result = await evaluator.evaluate_single_company(medium_quality_finding, "Find fintech companies using AI for fraud detection")
+        print(f"✅ Quality Score: {result.quality_score:.2f}")
+        print(f"✅ Coverage Score: {result.coverage_score:.2f}")
+        print(f"✅ Gaps: {result.gaps}")
+        print(f"✅ Issues: {result.evidence_issues}")
+        print(f"✅ Recommendations: {result.recommendations}")
+    except Exception as e:
+        print(f"❌ Failed: {e}")
+    
+    # Test case 3: Low quality company
+    low_quality_finding = create_mock_finding(
+        domain="unknown.com",
+        confidence_score=0.35,
+        evidence_sources=3,
+        goal_achieved=False,
+        technologies=["technology"],
+        evidences=[
+            "Company uses technology for payments"
+        ]
+    )
+    
+    print("\n📋 Test Case 3: Low Quality Company (Unknown)")
+    try:
+        result = await evaluator.evaluate_single_company(low_quality_finding, "Find fintech companies using AI for fraud detection")
+        print(f"✅ Quality Score: {result.quality_score:.2f}")
+        print(f"✅ Coverage Score: {result.coverage_score:.2f}")
+        print(f"✅ Gaps: {result.gaps}")
+        print(f"✅ Issues: {result.evidence_issues}")
+        print(f"✅ Recommendations: {result.recommendations}")
+    except Exception as e:
+        print(f"❌ Failed: {e}")
+
+async def test_quality_evaluator_aggregation():
+    """Test overall quality evaluation and aggregation"""
+    print("\n🧪 Testing Quality Evaluator Aggregation")
+    print("=" * 50)
+    
+    evaluator = QualityEvaluator()
+    
+    # Create mock findings
     findings = [
-        CompanyFinding(
+        create_mock_finding(
             domain="stripe.com",
-            confidence_score=0.9,
-            evidence_sources=6,
-            findings={
-                "goal_achieved": True,
-                "technologies": ["AI", "Machine Learning", "Real-time Analysis", "Fraud Detection", "Payment Processing"],
-                "evidences": [
-                    "Stripe uses AI and machine learning for fraud detection in payment processing",
-                    "Their systems analyze transaction patterns in real-time to identify suspicious activity",
-                    "Stripe's fraud detection capabilities include advanced algorithms",
-                    "The company has implemented AI-powered fraud prevention tools",
-                    "Stripe's AI-powered fraud detection helps merchants reduce fraud losses"
-                ],
-                "confidence_level": "High",
-                "research_goal": "AI-powered fraud detection in fintech"
-            },
-            signals_found=7
+            confidence_score=0.92,
+            evidence_sources=15,
+            goal_achieved=True,
+            technologies=["TensorFlow", "scikit-learn"],
+            evidences=["Stripe uses machine learning for fraud detection", "AI-powered risk assessment"]
         ),
-        CompanyFinding(
-            domain="sift.com",
-            confidence_score=0.9,
-            evidence_sources=6,
-            findings={
-                "goal_achieved": True,
-                "technologies": ["AI", "Machine Learning", "Behavioral Analysis", "Device Fingerprinting", "Real-time Monitoring", "E-commerce", "Fintech"],
-                "evidences": [
-                    "Sift provides AI-powered fraud detection solutions for e-commerce and fintech companies",
-                    "Their platform uses machine learning to identify fraudulent transactions",
-                    "Sift's fraud detection system analyzes user behavior patterns and transaction data",
-                    "The company offers comprehensive fraud prevention tools including device fingerprinting",
-                    "Sift offers real-time fraud prevention with customizable rules"
-                ],
-                "confidence_level": "High",
-                "research_goal": "AI-powered fraud detection in fintech"
-            },
-            signals_found=6
+        create_mock_finding(
+            domain="square.com",
+            confidence_score=0.75,
+            evidence_sources=10,
+            goal_achieved=True,
+            technologies=["AI", "analytics"],
+            evidences=["Square uses AI for payment processing", "Advanced analytics platform"]
         ),
-        CompanyFinding(
-            domain="hawk.ai",
-            confidence_score=0.9,
-            evidence_sources=6,
-            findings={
-                "goal_achieved": True,
-                "technologies": ["AI", "Machine Learning", "Cloud-based", "Financial Institutions", "Real-time Monitoring", "Advanced Analytics"],
-                "evidences": [
-                    "Hawk AI specializes in AI-driven fraud detection for financial institutions",
-                    "Their platform uses advanced machine learning algorithms",
-                    "Hawk AI's fraud detection system provides real-time monitoring and alerting",
-                    "The company offers cloud-based fraud prevention solutions with high accuracy rates",
-                    "Hawk AI's machine learning algorithms can detect fraud patterns across multiple channels"
-                ],
-                "confidence_level": "High",
-                "research_goal": "AI-powered fraud detection in fintech"
-            },
-            signals_found=7
+        create_mock_finding(
+            domain="paypal.com",
+            confidence_score=0.68,
+            evidence_sources=8,
+            goal_achieved=True,
+            technologies=["machine learning"],
+            evidences=["PayPal uses ML for fraud prevention"]
         ),
-        CompanyFinding(
-            domain="feedzai.com",
-            confidence_score=0.9,
-            evidence_sources=6,
-            findings={
-                "goal_achieved": True,
-                "technologies": ["AI", "Machine Learning", "Behavioral Analysis", "Risk Scoring", "Real-time Monitoring", "Banks", "Financial Services"],
-                "evidences": [
-                    "Feedzai develops AI-powered fraud detection software for banks and financial services",
-                    "Their platform uses machine learning for real-time transaction monitoring",
-                    "Feedzai's fraud detection capabilities include behavioral analysis and risk scoring",
-                    "The company provides comprehensive fraud prevention tools with advanced analytics",
-                    "Feedzai's platform uses machine learning to identify fraudulent transactions"
-                ],
-                "confidence_level": "High",
-                "research_goal": "AI-powered fraud detection in fintech"
-            },
-            signals_found=7
-        ),
-        CompanyFinding(
-            domain="sardine.ai",
-            confidence_score=0.9,
-            evidence_sources=6,
-            findings={
-                "goal_achieved": True,
-                "technologies": ["AI", "Machine Learning", "Fintech", "Digital Payments", "Real-time Detection", "Behavioral Analysis"],
-                "evidences": [
-                    "Sardine AI offers fraud detection solutions for fintech companies using artificial intelligence",
-                    "Sardine's platform provides real-time fraud detection with high accuracy and low latency",
-                    "The company specializes in AI-powered fraud prevention for digital payments",
-                    "Sardine's fraud prevention tools include behavioral analysis and risk-based authentication",
-                    "Sardine AI provides fraud detection solutions specifically designed for fintech companies"
-                ],
-                "confidence_level": "High",
-                "research_goal": "AI-powered fraud detection in fintech"
-            },
-            signals_found=6
+        create_mock_finding(
+            domain="unknown.com",
+            confidence_score=0.45,
+            evidence_sources=3,
+            goal_achieved=False,
+            technologies=["technology"],
+            evidences=["Company uses technology"]
         )
     ]
     
-    return GTMState(
-        research_goal="AI-powered fraud detection in fintech",
-        final_findings=findings,
-        max_parallel_searches=10,
-        iteration_count=1,
-        max_iterations=2
-    )
-
-def test_quality_evaluator_agent():
-    """Test the quality evaluator agent performance"""
+    # Create mock state
+    state = create_mock_state("Find fintech companies using AI for fraud detection", findings)
     
-    print("🧪 Testing Quality Evaluator Agent Performance")
-    print("=" * 55)
-    
-    # Check environment variables
-    if not os.getenv("OPENAI_API_KEY"):
-        print("❌ OPENAI_API_KEY not found in environment variables")
-        return
-    
-    print("✅ Environment variables found")
-    
-    # Create test state
-    test_state = create_test_state()
-    print(f"📝 Created test state with {len(test_state.final_findings)} findings")
-    
-    # Time the quality evaluation
-    print("\n⏱️  Starting performance test...")
-    start_time = time.time()
+    print(f"📊 Testing aggregation for {len(findings)} companies")
+    print(f"🎯 Research Goal: {state.research_goal}")
     
     try:
-        # Run the quality evaluator agent
-        result_state = quality_evaluator_agent(test_state)
+        result = await evaluator.analyze_coverage_and_quality_parallel(state)
         
-        end_time = time.time()
-        total_duration = (end_time - start_time) * 1000
-        
-        print(f"\n📊 Performance Results:")
-        print(f"  ⏱️  Total Time: {total_duration/1000:.2f}s ({total_duration:.2f}ms)")
-        print(f"  🏢 Companies Analyzed: {len(test_state.final_findings)}")
-        print(f"  📝 Total Evidence Sources: {sum(f.evidence_sources for f in test_state.final_findings)}")
-        
-        if result_state.quality_metrics:
-            quality_metrics = result_state.quality_metrics
-            print(f"  📊 Coverage Score: {quality_metrics.get('coverage_score', 0):.2f}")
-            print(f"  📊 Quality Score: {quality_metrics.get('quality_score', 0):.2f}")
-            print(f"  📊 Missing Aspects: {len(quality_metrics.get('missing_aspects', []))}")
-            print(f"  📊 Coverage Gaps: {len(quality_metrics.get('coverage_gaps', []))}")
-            print(f"  📊 Evidence Issues: {len(quality_metrics.get('evidence_issues', []))}")
-            print(f"  📊 Recommendations: {len(quality_metrics.get('recommendations', []))}")
-        
-        # Save test results
-        os.makedirs("../debug_output", exist_ok=True)
-        output_path = os.path.join("../debug_output", "quality_evaluator_test_results.json")
-        
-        test_results = {
-            "total_time_ms": total_duration,
-            "total_time_s": total_duration / 1000,
-            "companies_analyzed": len(test_state.final_findings),
-            "total_evidence_sources": sum(f.evidence_sources for f in test_state.final_findings),
-            "quality_metrics": result_state.quality_metrics if result_state.quality_metrics else {}
-        }
-        
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(test_results, f, ensure_ascii=False, indent=2)
-        
-        print(f"📁 Saved test results to {output_path}")
-        print(f"\n✅ Performance testing completed!")
-        print(f"Performance: {total_duration:.2f}ms for {len(test_state.final_findings)} companies")
+        print(f"\n✅ Overall Quality Score: {result.quality_score:.2f}")
+        print(f"✅ Overall Coverage Score: {result.coverage_score:.2f}")
+        print(f"✅ Missing Aspects: {result.missing_aspects}")
+        print(f"✅ Coverage Gaps: {result.coverage_gaps}")
+        print(f"✅ Evidence Issues: {result.evidence_issues}")
+        print(f"✅ Recommendations: {result.recommendations}")
+        print(f"✅ Company Analyses: {len(result.company_analyses)} companies analyzed")
         
     except Exception as e:
-        print(f"❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Aggregation failed: {e}")
+
+async def test_different_research_goals():
+    """Test quality evaluator with different research goals"""
+    print("\n🧪 Testing Different Research Goals")
+    print("=" * 50)
+    
+    research_goals = [
+        "Find companies using Kubernetes in production",
+        "Find B2B SaaS companies with 50-200 employees",
+        "Find healthcare companies using AI for diagnosis",
+        "Find companies using blockchain for supply chain",
+        "Find companies with remote-first culture"
+    ]
+    
+    # Create a standard finding for testing
+    standard_finding = create_mock_finding(
+        domain="test.com",
+        confidence_score=0.75,
+        evidence_sources=10,
+        goal_achieved=True,
+        technologies=["technology"],
+        evidences=["Company uses technology for business"]
+    )
+    
+    evaluator = CompanyQualityEvaluator()
+    
+    for i, goal in enumerate(research_goals, 1):
+        print(f"\n📋 Test Case {i}: {goal}")
+        try:
+            result = await evaluator.evaluate_single_company(standard_finding, goal)
+            print(f"   Quality: {result.quality_score:.2f} | Coverage: {result.coverage_score:.2f}")
+            print(f"   Gaps: {len(result.gaps)} | Issues: {len(result.evidence_issues)}")
+        except Exception as e:
+            print(f"   ❌ Failed: {e}")
+
+async def test_edge_cases():
+    """Test edge cases for quality evaluator"""
+    print("\n🧪 Testing Edge Cases")
+    print("=" * 50)
+    
+    evaluator = CompanyQualityEvaluator()
+    
+    # Edge case 1: Empty evidence
+    empty_finding = create_mock_finding(
+        domain="empty.com",
+        confidence_score=0.5,
+        evidence_sources=0,
+        goal_achieved=False,
+        technologies=[],
+        evidences=[]
+    )
+    
+    print("\n📋 Edge Case 1: Empty Evidence")
+    try:
+        result = await evaluator.evaluate_single_company(empty_finding, "Find companies using AI")
+        print(f"✅ Quality Score: {result.quality_score:.2f}")
+        print(f"✅ Coverage Score: {result.coverage_score:.2f}")
+    except Exception as e:
+        print(f"❌ Failed: {e}")
+    
+    # Edge case 2: Very high confidence but poor evidence
+    poor_evidence_finding = create_mock_finding(
+        domain="poor.com",
+        confidence_score=0.95,
+        evidence_sources=1,
+        goal_achieved=True,
+        technologies=["AI"],
+        evidences=["Company uses AI"]
+    )
+    
+    print("\n📋 Edge Case 2: High Confidence, Poor Evidence")
+    try:
+        result = await evaluator.evaluate_single_company(poor_evidence_finding, "Find companies using AI")
+        print(f"✅ Quality Score: {result.quality_score:.2f}")
+        print(f"✅ Coverage Score: {result.coverage_score:.2f}")
+    except Exception as e:
+        print(f"❌ Failed: {e}")
+
+async def main():
+    """Run all quality evaluator tests"""
+    print("🚀 Testing Quality Evaluator Agent")
+    print("=" * 60)
+    
+    # Test individual company evaluation
+    await test_company_quality_evaluator()
+    
+    # Test aggregation
+    await test_quality_evaluator_aggregation()
+    
+    # Test different research goals
+    await test_different_research_goals()
+    
+    # Test edge cases
+    await test_edge_cases()
+    
+    print("\n✅ Quality Evaluator Agent Tests Completed!")
+    print("💡 The agent should provide comprehensive quality and coverage analysis")
 
 if __name__ == "__main__":
-    test_quality_evaluator_agent() 
+    asyncio.run(main()) 

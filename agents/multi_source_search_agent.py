@@ -29,8 +29,8 @@ class LLMQueryBuilder:
         self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
         self.structured_llm = self.llm.with_structured_output(SearchQueriesOutput)
         self.prompt = PromptTemplate.from_template("""
-You are an expert search query builder for GTM research. Your task is to generate 3-5 highly targeted search queries for finding evidence about a specific company about a reasearch goal.
-Remember to add the company name in the queries for a company targetted search.
+You are an expert search query builder for GTM research. Your task is to generate 3-5 highly targeted search queries for finding evidence about a specific company about a research goal.
+Remember to add the company name in the queries for a company targeted search.
 
 Company Information:
 - Name: {company_name}
@@ -38,17 +38,16 @@ Company Information:
 
 Research Goal: {research_goal}
 
-Available Refined Strategies (if any):
-{refined_strategies_text}
+{company_feedback}
 
 Instructions:
 1. Generate 3-5 search queries that will find the most relevant evidence
 2. Use specific, targeted terms that match the research goal
-3. If refined strategies are available, incorporate their insights
-4. Include both company-specific and domain-specific variations
-5. Use advanced search operators when helpful (site:, "quotes", AND, OR, etc.)
-6. Focus on finding concrete evidence, not just general information
-7. Ensure queries are diverse in their approach (case studies, technical details, user reviews, etc.)
+3. Include both company-specific and domain-specific variations
+4. Use advanced search operators when helpful (site:, "quotes", AND, OR, etc.)
+5. Focus on finding concrete evidence, not just general information
+6. Ensure queries are diverse in their approach (case studies, technical details, user reviews, etc.)
+7. If quality feedback is available, prioritize queries that address the specific gaps and issues identified
 
 Return a structured response with:
 - queries: List of 3-5 search queries with company name in the queries
@@ -56,23 +55,51 @@ Return a structured response with:
 - search_focus: Primary focus area for these queries
 """)
 
-    async def build_queries_async(self, company_name: str, domain: str, research_goal: str, refined_strategies: list = None) -> List[str]:
-        """Build queries asynchronously using ainvoke"""
-        refined_strategies_text = "None available"
-        if refined_strategies:
-            strategy_texts = []
-            for i, strategy in enumerate(refined_strategies[:3]):
-                strategy_type = strategy.get('strategy_type', 'unknown')
-                queries = strategy.get('search_queries', [])
-                reasoning = strategy.get('reasoning', '')
-                strategy_texts.append(f"Strategy {i+1} ({strategy_type}): {queries[:2]} - {reasoning[:100]}...")
-            refined_strategies_text = "\n".join(strategy_texts)
+    async def build_queries_async(self, company_name: str, domain: str, research_goal: str, quality_metrics: dict = None) -> List[str]:
+        """Build queries asynchronously using ainvoke with quality feedback"""
+        
+        # Get company-specific quality feedback
+        company_feedback = ""
+        if quality_metrics and 'company_analyses' in quality_metrics:
+            company_analyses = quality_metrics['company_analyses']
+            # Find analysis for this specific company
+            for analysis in company_analyses:
+                if analysis.get('company_domain') == domain:
+                    quality_score = analysis.get('quality_score', 0)
+                    coverage_score = analysis.get('coverage_score', 0)
+                    gaps = analysis.get('gaps', [])
+                    evidence_issues = analysis.get('evidence_issues', [])
+                    recommendations = analysis.get('recommendations', [])
+                    
+                    # Convert lists to readable format
+                    gaps_text = "\n".join([f"- {gap}" for gap in gaps[:3]]) if gaps else "None identified"
+                    issues_text = "\n".join([f"- {issue}" for issue in evidence_issues[:3]]) if evidence_issues else "None identified"
+                    recs_text = "\n".join([f"- {rec}" for rec in recommendations[:3]]) if recommendations else "None provided"
+                    
+                    company_feedback = f"""
+
+PREVIOUS RESEARCH QUALITY FOR THIS COMPANY:
+Quality Score: {quality_score:.2f}/1.0
+Coverage Score: {coverage_score:.2f}/1.0
+
+SPECIFIC GAPS FOR THIS COMPANY:
+{gaps_text}
+
+EVIDENCE ISSUES FOR THIS COMPANY:
+{issues_text}
+
+RECOMMENDATIONS FOR THIS COMPANY:
+{recs_text}
+
+IMPORTANT: Use this feedback to generate more targeted queries that address the specific gaps and issues for this company.
+"""
+                    break
         
         prompt_input = {
             "company_name": company_name,
             "domain": domain,
             "research_goal": research_goal,
-            "refined_strategies_text": refined_strategies_text
+            "company_feedback": company_feedback
         }
         
         try:
@@ -160,12 +187,10 @@ def multi_source_search_agent(state: GTMState) -> GTMState:
 
     search_goal = state.research_goal
     
-    # Check if we have refined strategies from strategy refinement agent
-    strategy_refinement = state.strategy_refinement or {}
-    refined_strategies = strategy_refinement.get('refined_strategies', [])
-    
-    if refined_strategies:
-        print(f"🎯 Using {len(refined_strategies)} refined strategies for targeted searches")
+    # Check if we have quality metrics for feedback
+    quality_metrics = state.quality_metrics or {}
+    if quality_metrics:
+        print(f"🎯 Using quality metrics feedback for targeted searches")
     else:
         print(f"📝 Using default search strategies")
 
@@ -185,7 +210,7 @@ def multi_source_search_agent(state: GTMState) -> GTMState:
             """Generate queries for a single company using async LLM"""
             async with sem:
                 try:
-                    queries = await llm_query_builder.build_queries_async(company.name, company.domain, search_goal, refined_strategies)
+                    queries = await llm_query_builder.build_queries_async(company.name, company.domain, search_goal, state.quality_metrics)
                     # print(f"  📝 {company.name} ({company.domain}): {queries}")
                     return queries
                 except Exception as e:

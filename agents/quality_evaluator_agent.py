@@ -104,7 +104,7 @@ class QualityEvaluator:
         self.company_evaluator = CompanyQualityEvaluator()
         
         self.aggregation_prompt = PromptTemplate.from_template(
-            """You are a research quality analyst. Aggregate individual company analyses into an overall assessment.
+            """You are a senior research quality analyst. Aggregate individual company analyses into an overall assessment based on the research goal.
 
 Research Goal: {research_goal}
 
@@ -184,13 +184,18 @@ Return a structured analysis with:
         # Prepare company analyses text for aggregation
         company_analyses_text = ""
         for analysis in company_analyses:
+            # Convert lists to readable string format
+            gaps_text = "\n".join([f"  * {gap}" for gap in analysis.gaps[:2]]) if analysis.gaps else "None identified"
+            issues_text = "\n".join([f"  * {issue}" for issue in analysis.evidence_issues[:2]]) if analysis.evidence_issues else "None identified"
+            
             company_analyses_text += f"""
             Company: {analysis.company_domain}
             Quality Score: {analysis.quality_score:.2f}
             Coverage Score: {analysis.coverage_score:.2f}
-            Gaps: {analysis.gaps}
-            Issues: {analysis.evidence_issues}
-            Recommendations: {analysis.recommendations}
+            Gaps:
+            {gaps_text}
+            Issues:
+            {issues_text}
             """
         
         # Generate overall analysis using async call

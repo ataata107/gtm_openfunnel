@@ -31,7 +31,6 @@ def build_gtm_graph():
     # builder.add_edge("WebsiteScraperAgent", "EvaluatorAgent")
     builder.add_edge("SearchAgent", "EvaluatorAgent")
     builder.add_edge("EvaluatorAgent", "QualityEvaluatorAgent")
-    builder.add_edge("QualityEvaluatorAgent", "StrategyRefinementAgent")
 
     # Feedback loop: If quality is low, loop back to search with refined strategies
     def should_continue_research(state):
@@ -55,12 +54,12 @@ def build_gtm_graph():
         
         return should_continue
     
-    # Conditional edge: StrategyRefinementAgent -> SearchAgent (if quality is low)
+    # Conditional edge: QualityEvaluatorAgent -> QueryAgent (if quality is low)
     builder.add_conditional_edges(
-        "StrategyRefinementAgent",
+        "QualityEvaluatorAgent",
         should_continue_research,
         {
-            True: "SearchAgent",  # Loop back to search with refined strategies
+            True: "QueryAgent",  # Loop back to query agent to generate new strategies
             False: "__end__"      # End if quality is good enough
         }
     )
