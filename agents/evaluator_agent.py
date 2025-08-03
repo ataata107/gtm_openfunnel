@@ -29,16 +29,29 @@ Company: {company}
 Raw evidences:
 {evidence}
 
-Analyze the evidences to determine if the company meets the research goal criteria. Look for:
+Analyze the raw evidences to determine if the company meets the research goal criteria. Look for:
 1. Direct mentions or evidence related to the research goal by the company itself
-2. Technologies, tools, or capabilities that align with the goal
-3. Case studies, examples, or descriptions that demonstrate relevance
-4. Any quantitative data or metrics related to the goal
+2. Technologies, tools, capabilities, or practices that align with the goal
+3. Case studies, examples, descriptions, or announcements that demonstrate relevance
+4. Any quantitative data, metrics, or qualitative indicators related to the goal
+5. Industry-specific terminology, jargon, or context that relates to the research goal
+6. Partnerships, integrations, or collaborations that support the research goal
+7. Product features, services, or offerings that address the research goal
+8. Market positioning, competitive advantages, or unique selling points related to the goal
+
+Consider the research goal holistically - it could be about:
+- Technology adoption (e.g., AI, blockchain, cloud computing)
+- Business practices (e.g., remote work, sustainability, diversity)
+- Market positioning (e.g., B2B, enterprise, startup)
+- Industry focus (e.g., fintech, healthcare, education)
+- Company characteristics (e.g., size, funding, growth stage)
+- Product capabilities (e.g., features, integrations, APIs)
+- Operational aspects (e.g., security, compliance, scalability)
 
 Return a Pydantic model with:
 - goal_achieved: whether the company meets the research goal criteria
-- technologies: relevant technologies, tools, or capabilities mentioned
-- evidences: list of relevant snippets from the input
+- technologies: relevant technologies, tools, capabilities, or practices mentioned
+- evidences: list of relevant distinct snippets from the input that support the assessment
 - confidence_level: High/Medium/Low confidence in the assessment
 """
         )

@@ -31,23 +31,32 @@ Your task is to generate 10 different search strategies for the following resear
 Research goal: {research_goal}
 
 Generate 10 diverse search strategies that:
-1. Use different keywords and phrases
-2. Target different information sources (news, company websites, technical blogs, etc.)
-3. Focus on different aspects (technology, business, implementation, etc.)
+1. Use different keywords and phrases related to the research goal
+2. Target different information sources (news, company websites, technical blogs, job boards, etc.)
+3. Focus on different aspects (technology, business, implementation, market, etc.)
 4. Use various search techniques (quotes, site-specific, date ranges, etc.)
-5. Target different stakeholders (developers, executives, analysts, etc.)
+5. Target different stakeholders (developers, executives, analysts, customers, etc.)
 
-Examples of strategy types:
-- Technology-focused: "machine learning fraud detection fintech"
-- Company-focused: "stripe square fraud detection AI"
-- Implementation-focused: "fraud detection API implementation"
-- News-focused: "fintech AI fraud detection 2024"
-- Technical-focused: "fraud detection algorithms fintech"
-- Business-focused: "AI fraud prevention fintech companies"
-- Product-focused: "fraud detection software fintech"
-- Industry-focused: "payments fraud detection AI"
-- Case study-focused: "fraud detection success stories fintech"
-- Competitive-focused: "fraud detection market leaders fintech"
+Strategy generation guidelines:
+- Break down the research goal into different components and keywords
+- Create variations that focus on different aspects of the goal
+- Include industry-specific terms and jargon
+- Use different search operators and techniques
+- Target both broad and specific search terms
+- Consider different time periods and contexts
+- Include both technical and business perspectives
+
+Examples of strategy types (adapt these to your specific research goal):
+- Technology-focused: Focus on specific technologies, tools, or technical implementations
+- Company-focused: Target specific companies or competitors
+- Implementation-focused: Look for implementation details, APIs, or technical guides
+- News-focused: Search for recent news, announcements, or developments
+- Technical-focused: Focus on technical documentation, algorithms, or methodologies
+- Business-focused: Look for business cases, market analysis, or industry trends
+- Product-focused: Search for product features, capabilities, or solutions
+- Industry-focused: Target industry-specific terms and contexts
+- Case study-focused: Look for success stories, case studies, or examples
+- Competitive-focused: Search for market leaders, competitors, or industry analysis
 
 Return exactly 10 search strategies as the 'search_strategies_generated' field of a Pydantic model. 
 """

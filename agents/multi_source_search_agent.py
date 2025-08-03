@@ -29,7 +29,8 @@ class LLMQueryBuilder:
         self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
         self.structured_llm = self.llm.with_structured_output(SearchQueriesOutput)
         self.prompt = PromptTemplate.from_template("""
-You are an expert search query builder for GTM research. Your task is to generate 3-5 highly targeted search queries for finding evidence about a specific company.
+You are an expert search query builder for GTM research. Your task is to generate 3-5 highly targeted search queries for finding evidence about a specific company about a reasearch goal.
+Remember to add the company name in the queries for a company targetted search.
 
 Company Information:
 - Name: {company_name}
@@ -50,7 +51,7 @@ Instructions:
 7. Ensure queries are diverse in their approach (case studies, technical details, user reviews, etc.)
 
 Return a structured response with:
-- queries: List of 3-5 search queries
+- queries: List of 3-5 search queries with company name in the queries
 - reasoning: Brief explanation of your query strategy
 - search_focus: Primary focus area for these queries
 """)
@@ -81,16 +82,42 @@ Return a structured response with:
             if not queries:
                 queries = [f"{company_name} {research_goal}", f"{domain} {research_goal}", f"{company_name} site:{domain} {research_goal}"]
             
-            # print(f"🤖 LLM generated {len(queries)} queries for {company_name}")
+            # Enhance queries: ensure company name is included if not present
+            enhanced_queries = []
+            for query in queries:
+                # Check if company name or domain is already in the query
+                company_in_query = (
+                    company_name.lower() in query.lower() or 
+                    domain.lower() in query.lower() or
+                    company_name.split()[0].lower() in query.lower()  # Check first word of company name
+                )
+                
+                if not company_in_query:
+                    # Add company name to the beginning of the query
+                    enhanced_query = f"{company_name} {query}"
+                    enhanced_queries.append(enhanced_query)
+                else:
+                    enhanced_queries.append(query)
+            
+            # print(f"🤖 LLM generated {len(enhanced_queries)} queries for {company_name}")
             # print(f"   Focus: {structured_response.search_focus}")
             # print(f"   Reasoning: {structured_response.reasoning}")
-            # print(f"   Queries: {queries}")
+            # print(f"   Original Queries: {queries}")
+            # print(f"   Enhanced Queries: {enhanced_queries}")
             
-            return queries[:5]
+            return enhanced_queries[:5]
             
         except Exception as e:
             print(f"❌ LLM query generation failed for {company_name}: {e}")
-            return [f"{company_name} {research_goal}", f"{domain} {research_goal}", f"{company_name} site:{domain} {research_goal}"]
+            # Fallback queries always include company name
+            fallback_queries = [
+                f"{company_name} {research_goal}", 
+                f"{domain} {research_goal}", 
+                f"{company_name} site:{domain} {research_goal}",
+                f"{company_name} company {research_goal}",
+                f"{company_name} technology {research_goal}"
+            ]
+            return fallback_queries[:5]
 
 # Initialize the LLM query builder
 llm_query_builder = LLMQueryBuilder()
@@ -200,7 +227,7 @@ def multi_source_search_agent(state: GTMState) -> GTMState:
                 search_results_serper.setdefault(matched_company.domain, []).extend(result)
             else:
                 # Fallback: try to extract domain from query or use a default
-                # print(f"⚠️ Could not match query '{query}' to any company domain")
+                print(f"⚠️ Could not match query '{query}' to any company domain")
                 # Add to a general bucket to avoid losing data
                 search_results_serper.setdefault("unknown", []).extend(result)
 

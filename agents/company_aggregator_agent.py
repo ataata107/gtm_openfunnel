@@ -38,9 +38,27 @@ Your goal: Extract distinct companies relevant to the following research objecti
 Research Goal: {research_goal}
 
 Given the following raw text from a search engine result, extract all **unique companies** that match the research goal.
+
+Consider the research goal holistically - it could be about:
+- Technology adoption (e.g., AI, blockchain, cloud computing)
+- Business practices (e.g., remote work, sustainability, diversity)
+- Market positioning (e.g., B2B, enterprise, startup)
+- Industry focus (e.g., fintech, healthcare, education)
+- Company characteristics (e.g., size, funding, growth stage)
+- Product capabilities (e.g., features, integrations, APIs)
+- Operational aspects (e.g., security, compliance, scalability)
+
+Extraction guidelines:
+1. Look for company names mentioned in titles, snippets, or URLs
+2. Extract both well-known and emerging companies
+3. Focus on companies that align with the research goal
+4. Include companies mentioned in case studies, partnerships, or comparisons
+5. Consider industry-specific terminology and context
+6. Look for companies in different stages (startups, scale-ups, enterprises)
+
 Return a list of companies with:
-- Company name
-- Domain (e.g., stripe.com)
+- Company name (use the most common/recent name)
+- Domain (e.g., stripe.com, company.com)
 - The source URL where it was mentioned
 
 Only return a list of Pydantic models with the fields: name, domain, source_url.

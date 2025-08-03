@@ -38,14 +38,15 @@ class CompanyQualityEvaluator:
         self.structured_llm = self.llm.with_structured_output(CompanyQualityAnalysis)
         
         self.company_prompt = PromptTemplate.from_template(
-            """You are a research quality analyst. Analyze the quality and coverage for a single company's findings.
+            """You are a senior research quality analyst with expertise in data validation, market intelligence, and strategic research. 
+            Your role is to perform a multi-dimensional analysis of company research findings, assessing evidence quality, coverage depth, and strategic relevance to the research goal.
 
 Research Goal: {research_goal}
 
 Company Analysis:
 Company: {company_domain}
 Confidence Score: {confidence_score}
-Evidence Sources: {evidence_sources}
+Number of Evidence Sources: {evidence_sources}
 Goal Achieved: {goal_achieved}
 Technologies: {technologies}
 Evidence Snippets: {evidence_snippets}
@@ -53,26 +54,26 @@ Evidence Snippets: {evidence_snippets}
 Analyze this company's research quality and coverage:
 
 1. **Quality Analysis:**
-   - How reliable is the evidence for this company?
-   - Are there issues with the evidence quality?
-   - Is the evidence recent and relevant?
+   - How reliable is the evidence for this company with respect to the research goal?
+   - Are there issues with the evidence quality with respect to the research goal?
+   - Is the evidence recent and relevant with respect to the research goal?
 
 2. **Coverage Analysis:**
-   - How well does this company's data cover the research goal?
-   - What specific information is missing for this company?
-   - Are there gaps in the analysis?
+   - How well does this company's evidence snippets cover the research goal?
+   - What specific information with respect to the research goal is missing for this company from the snippets?
+   - Are there gaps in the analysis with respect to the research goal?
 
 3. **Gap Identification:**
-   - What specific information is missing for this company?
-   - What additional research would help for this company?
+   - What specific information with respect to the research goal is missing for this company?
+   - What additional research with respect to the research goal would help for this company?
 
 Return a structured analysis with:
 - company_domain: The company domain
 - quality_score: 0-1 score of evidence quality for this company
-- coverage_score: 0-1 score of how well this company covers the goal
-- gaps: List of specific gaps for this company
-- evidence_issues: Problems with evidence for this company
-- recommendations: Company-specific recommendations
+- coverage_score: 0-1 score of how well this company covers the research goal
+- gaps: List of specific gaps for this company with respect to the research goal
+- evidence_issues: Problems with evidence for this company with respect to the research goal
+- recommendations: Company-specific recommendations with respect to the research goal
 """
         )
 
