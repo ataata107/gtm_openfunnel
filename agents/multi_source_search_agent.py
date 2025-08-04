@@ -158,7 +158,7 @@ def multi_source_search_agent(state: GTMState) -> GTMState:
         print(f"📊 Found quality data for {len(quality_metrics['company_analyses'])} companies")
     else:
         print(f"📝 Using default search strategies")
-    
+
     print(f"🎯 Search depth: {state.search_depth}")
 
     # TIME QUERY GENERATION AND EVALUATION

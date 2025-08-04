@@ -37,9 +37,9 @@ def query_agent(state: GTMState) -> GTMState:
     
     # Configure search depth - optimized for faster execution
     SEARCH_DEPTH_CONFIGS = {
-        "quick": {"strategies": 5, "description": "5 focused search strategies"},
-        "standard": {"strategies": 10, "description": "10 diverse search strategies"},
-        "comprehensive": {"strategies": 15, "description": "15 comprehensive search strategies"}
+        "quick": {"strategies": 10, "description": "10 focused search strategies"},
+        "standard": {"strategies": 20, "description": "20 diverse search strategies"},
+        "comprehensive": {"strategies": 30, "description": "30 comprehensive search strategies"}
     }
     
     config = SEARCH_DEPTH_CONFIGS.get(state.search_depth, SEARCH_DEPTH_CONFIGS["standard"])
@@ -93,7 +93,7 @@ IMPORTANT: Use this quality feedback to generate more targeted search strategies
 
 {quality_guidance}
 
-Strategy types to adapt:
+Strategy types to adapt to make the search strategies more diverse:
 - Technology: specific tools, implementations
 - Company: competitors, market leaders  
 - News: recent announcements, developments
@@ -102,7 +102,14 @@ Strategy types to adapt:
 - Product: features, capabilities
 - Case studies: success stories, examples
 
-Return exactly {num_strategies} search strategies as 'search_strategies_generated'.
+IMPORTANT: Return ONLY clean, direct search terms without any prefixes, instructions, or unnecessary words.
+Examples of diverse search strategies:
+- "AI fraud detection companies"
+- "machine learning fraud prevention tools"
+- "Companies using AWS"
+- "Companies who are in te process of getting SOC 2"
+Avoid phrases like "Search for...", "Find...", "Look for...", "Companies that...", etc.
+Return exactly {num_strategies} clean, direct and distinct search terms as 'search_strategies_generated'.
 """
     )
 

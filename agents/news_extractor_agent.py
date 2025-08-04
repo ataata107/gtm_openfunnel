@@ -24,9 +24,9 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
 # Global search depth configuration - same as company_aggregator_agent
 SEARCH_DEPTH_CONFIGS = {
-    "quick": {"num_results": 10, "companies_per_query": 20, "max_companies": 50, "description": "10 results per search, 10 companies per query, 50 companies max"},
-    "standard": {"num_results": 20, "companies_per_query": 20, "max_companies": 100, "description": "20 results per search, 10 companies per query, 100 companies max"},
-    "comprehensive": {"num_results": 30, "companies_per_query": 28, "max_companies": 200, "description": "30 results per search, 14 companies per query, 200 companies max"}
+    "quick": {"num_results": 40, "companies_per_query": 20, "max_companies": 50, "description": "10 results per search, 10 companies per query, 50 companies max"},
+    "standard": {"num_results": 40, "companies_per_query": 20, "max_companies": 100, "description": "20 results per search, 10 companies per query, 100 companies max"},
+    "comprehensive": {"num_results": 40, "companies_per_query": 28, "max_companies": 200, "description": "30 results per search, 14 companies per query, 200 companies max"}
 }
 
 class CompanyExtractionOutput(BaseModel):
@@ -36,7 +36,7 @@ class CompanyExtractionOutput(BaseModel):
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 # Create Serper news search wrapper and tool
-news_search = GoogleSerperAPIWrapper(serper_api_key=SERPER_API_KEY, type="news")
+news_search = GoogleSerperAPIWrapper(serper_api_key=SERPER_API_KEY, type="news", k=40)
 news_search_tool = Tool(
     name="news_search",
     func=news_search.run,
@@ -54,9 +54,14 @@ async def extract_companies_from_news_queries(queries: List[str], research_goal:
     config = SEARCH_DEPTH_CONFIGS.get(search_depth, SEARCH_DEPTH_CONFIGS["standard"])
     companies_per_query = config["companies_per_query"]
     max_companies = config["max_companies"]
+    num_results = config["num_results"]
+    
+    # Configure news search results based on search depth
+    # news_search.k = num_results
     
     print(f"📰 NEWS EXTRACTOR: Using {search_depth} search depth")
     print(f"📊 Target: {companies_per_query} companies per query, {max_companies} max total")
+    print(f"🔍 News search results: {num_results} per query")
     
     # Create browser and tools within the function scope
     async_browser = create_async_playwright_browser(headless=True)
@@ -79,17 +84,22 @@ async def extract_companies_from_news_queries(queries: List[str], research_goal:
                     Please search for news articles about companies relevant to this goal: {research_goal}
                     
                     Use the news_search tool to find recent news article links about companies satisfying the goal.
-                    Then use the browser tools to visit the links and extract company information.
+                    Then use the browser tools to visit all the links you get from news search and extract companies.
                     
-                    IMPORTANT: Extract atmost {companies_per_query} companies from the news article links. Be comprehensive and thorough.
+                    IMPORTANT: Extract AT LEAST 15-20 companies from the news article links. Be extremely thorough and comprehensive.
                     Include companies that are:
                     - Directly relevant to the goal
                     - Competitors or similar companies mentioned in articles
                     - Companies featured in news, lists, or comparisons
                     - Companies mentioned in quotes, interviews, or case studies
+                    - Companies from different market segments
+                    - Both established and emerging companies
+                    - Companies mentioned in case studies, reports, or reviews
+                    - Companies from different geographical regions
                     
-                    Return atmost {companies_per_query} companies with their names and domains.
-                    Focus on quality and relevance over quantity.
+                    Search multiple news sources and visit multiple articles to find more companies.
+                    Return AT LEAST 15-20 companies with their names and domains.
+                    Focus on comprehensive coverage over perfect relevance.
                     """
                     
                     # Let the LLM use both tools directly

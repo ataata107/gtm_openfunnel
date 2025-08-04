@@ -25,9 +25,9 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 # Standard: 10 queries × 10 companies/query = 100 total companies  
 # Comprehensive: 15 queries × 13-14 companies/query = 200 total companies
 SEARCH_DEPTH_CONFIGS = {
-    "quick": {"num_results": 10, "companies_per_query": 20, "max_companies": 50, "description": "10 results per search, 10 companies per query, 50 companies max"},
-    "standard": {"num_results": 20, "companies_per_query": 20, "max_companies": 100, "description": "20 results per search, 10 companies per query, 100 companies max"},
-    "comprehensive": {"num_results": 30, "companies_per_query": 28, "max_companies": 200, "description": "30 results per search, 14 companies per query, 200 companies max"}
+    "quick": {"num_results": 40, "companies_per_query": 20, "max_companies": 50, "description": "10 results per search, 10 companies per query, 50 companies max"},
+    "standard": {"num_results": 40, "companies_per_query": 20, "max_companies": 100, "description": "20 results per search, 10 companies per query, 100 companies max"},
+    "comprehensive": {"num_results": 40, "companies_per_query": 28, "max_companies": 200, "description": "30 results per search, 14 companies per query, 200 companies max"}
 }
 
 class CompanyExtractionOutput(BaseModel):
@@ -37,7 +37,7 @@ class CompanyExtractionOutput(BaseModel):
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 # Create Serper search wrapper and tool
-search = GoogleSerperAPIWrapper(serper_api_key=SERPER_API_KEY)
+search = GoogleSerperAPIWrapper(serper_api_key=SERPER_API_KEY, k=40)
 serper_tool = Tool(
     name="search",
     func=search.run,
@@ -64,7 +64,7 @@ async def extract_companies_with_serper_tool(query: str, research_goal: str, sea
         companies_per_query = config["companies_per_query"]
         
         # Update search wrapper with correct number of results
-        search.k = num_results
+        # search.k = num_results
         
         # Direct message to LLM with tools
         message = f"""
@@ -73,15 +73,21 @@ async def extract_companies_with_serper_tool(query: str, research_goal: str, sea
         Use the search tool to find information about companies that match this research objective.
         Search for terms like "{query}" and related keywords to find relevant companies.
         
-        IMPORTANT: Extract atmost {companies_per_query} companies. 
+        IMPORTANT: Extract AT LEAST 60 companies. Be extremely thorough and comprehensive.
         Include companies that are:
         - Directly relevant to the research goal
         - Related to the industry or technology mentioned
         - Competitors or similar companies
         - Companies mentioned in articles, lists, or comparisons
+        - Companies from different market segments
+        - Both established and emerging companies
+        - Companies mentioned in case studies, reports, or reviews
+        - Companies from different geographical regions
+        - Companies with different business models
         
-        Return atmost {companies_per_query} companies with their names and domains.
-        Focus on quality and relevance over quantity.
+        Search multiple times with different keywords if needed to find more companies.
+        Return a list of AT LEAST 60 COMPANIES. Do not stop at fewer. Prioritize breadth.
+        Output only the companies, each with name and domain, clearly listed.
         """
         
         # Let the LLM use the search tool directly
@@ -129,6 +135,9 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
     # TIME PARALLEL EXTRACTION (SERPER + NEWS)
     import time
     extraction_start = time.time()
+    
+    # Initialize Serper companies counter
+    serper_companies_count = 0
     
     async def extract_all_companies_parallel():
         sem = asyncio.Semaphore(state.max_parallel_searches)
@@ -199,6 +208,11 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
             news_task
         )
         
+        # Count Serper companies
+        nonlocal serper_companies_count
+        for companies in serper_results:
+            serper_companies_count += len(companies)
+        
         # Combine Serper results
         for companies in serper_results:
             for company in companies:
@@ -219,6 +233,7 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
     extraction_duration = (extraction_end - extraction_start) * 1000
     print(f"⏱️  Parallel extraction (Serper + News) took: {extraction_duration:.2f}ms ({extraction_duration/1000:.2f}s)")
     print(f"🔍 Total extracted companies: {len(extracted_companies)}")
+    print(f"🔍 Companies extracted from Serper: {serper_companies_count}")
 
     # ✅ Save to disk for debugging
     os.makedirs("debug_output", exist_ok=True)

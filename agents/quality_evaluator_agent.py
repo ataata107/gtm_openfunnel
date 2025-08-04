@@ -38,9 +38,9 @@ class CompanyQualityEvaluator:
         
         self.company_prompt = PromptTemplate.from_template(
             """You are a senior research quality analyst with expertise in data validation, market intelligence, and strategic research. 
-            Your role is to perform a multi-dimensional analysis of company research findings, assessing evidence quality, coverage depth, and strategic relevance to the research goal.
+            Your role is to perform a multi-dimensional analysis of company research findings, assessing evidence quality, coverage depth, and strategic relevance to the  goal.
 
-Research Goal: {research_goal}
+Goal: {research_goal}
 
 Company Analysis:
 Company: {company_domain}
@@ -144,7 +144,7 @@ Return a structured analysis with:
 """
         )
 
-    async def analyze_coverage_and_quality_parallel(self, state: GTMState) -> CoverageAnalysis:
+    async def analyze_coverage_and_quality_parallel(self, state: GTMState) -> tuple[CoverageAnalysis, List[CompanyQualityAnalysis]]:
         """Analyze quality and coverage using parallel company evaluations"""
         
         print(f"🔍 Running parallel quality analysis for {len(state.final_findings)} companies...")
@@ -217,9 +217,9 @@ Return a structured analysis with:
         print(f"⏱️  Aggregation analysis took: {aggregation_duration:.2f}ms ({aggregation_duration/1000:.2f}s)")
         
         # Add company analyses to the result
-        object.__setattr__(overall_analysis, 'company_analyses', company_analyses)
+        # object.__setattr__(overall_analysis, 'company_analyses', company_analyses)
         
-        return overall_analysis
+        return overall_analysis, company_analyses
 
 def quality_evaluator_agent(state: GTMState) -> GTMState:
     """Analyze research coverage and quality using parallel company evaluations"""
@@ -237,7 +237,7 @@ def quality_evaluator_agent(state: GTMState) -> GTMState:
     
     try:
         # Run parallel analysis
-        analysis = asyncio.run(evaluator.analyze_coverage_and_quality_parallel(state))
+        analysis, company_analyses = asyncio.run(evaluator.analyze_coverage_and_quality_parallel(state))
         
         quality_end = time.time()
         quality_duration = (quality_end - quality_start) * 1000
@@ -277,12 +277,20 @@ def quality_evaluator_agent(state: GTMState) -> GTMState:
         # Save analysis to debug output
         os.makedirs("debug_output", exist_ok=True)
         output_path = os.path.join("debug_output", "quality_analysis.json")
-        # try:
-        #     with open(output_path, "w", encoding="utf-8") as f:
-        #         json.dump(analysis.model_dump(), f, ensure_ascii=False, indent=2)
-        #     print(f"📁 Saved quality analysis to {output_path}")
-        # except Exception as e:
-        #     print(f"⚠️ Failed to write quality analysis: {e}")
+        output_path_company_analyses = os.path.join("debug_output", "company_analyses.json")
+        try:
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(analysis.model_dump(), f, ensure_ascii=False, indent=2)
+            print(f"📁 Saved quality analysis to {output_path}")
+        except Exception as e:
+            print(f"⚠️ Failed to write quality analysis: {e}")
+
+        try:
+            with open(output_path_company_analyses, "w", encoding="utf-8") as f:
+                json.dump([analysis.model_dump() for analysis in company_analyses], f, ensure_ascii=False, indent=2)
+            print(f"📁 Saved company analyses to {output_path_company_analyses}")
+        except Exception as e:
+            print(f"⚠️ Failed to write company analyses: {e}")
         
         # Update state with quality metrics
         quality_metrics = {
@@ -292,7 +300,7 @@ def quality_evaluator_agent(state: GTMState) -> GTMState:
             "coverage_gaps": analysis.coverage_gaps,
             "evidence_issues": analysis.evidence_issues,
             "recommendations": analysis.recommendations,
-            "company_analyses": [analysis.model_dump() for analysis in analysis.company_analyses]
+            "company_analyses": [analysis.model_dump() for analysis in company_analyses]
         }
         
         return state.model_copy(update={"quality_metrics": quality_metrics})
