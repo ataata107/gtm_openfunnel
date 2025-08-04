@@ -10,6 +10,9 @@ import json
 import requests
 import logging
 from utils.cache import cache
+from agents.news_search_agent import get_news_urls_for_queries
+from agents.news_extractor_agent import extract_companies_from_news_urls
+from graph.state import ExtractedCompany
 
 load_dotenv()
 
@@ -18,9 +21,14 @@ logger = logging.getLogger(__name__)
 
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
-class ExtractedCompany(BaseModel):
-    name: str = Field(..., description="Company name")
-    domain: str = Field(..., description="Company domain (e.g., stripe.com)")
+# Global search depth configuration
+SEARCH_DEPTH_CONFIGS = {
+    "quick": {"num_results": 10, "max_companies": 50, "description": "15 results per search, 50 companies max"},
+    "standard": {"num_results": 20, "max_companies": 100, "description": "20 results per search, 100 companies max"},
+    "comprehensive": {"num_results": 30, "max_companies": 200, "description": "30 results per search, 200 companies max"}
+}
+
+
     #source_url: str = Field(..., description="The URL where the company was found")
 
 class CompanyExtractionOutput(BaseModel):
@@ -86,13 +94,7 @@ async def run_serper(query: str, sem: asyncio.Semaphore, search_depth: str = "st
             
             url = "https://google.serper.dev/search"
             
-            # Configure search depth
-            SEARCH_DEPTH_CONFIGS = {
-                "quick": {"num_results": 10, "description": "10 results per search"},
-                "standard": {"num_results": 20, "description": "20 results per search"},
-                "comprehensive": {"num_results": 30, "description": "30 results per search"}
-            }
-            
+            # Use global search depth configuration
             config = SEARCH_DEPTH_CONFIGS.get(search_depth, SEARCH_DEPTH_CONFIGS["standard"])
             num_results = config["num_results"]
             
@@ -177,13 +179,7 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
     async def extract_companies_async():
         sem = asyncio.Semaphore(state.max_parallel_searches)  # Limit concurrent LLM calls
         
-        # Configure company limits based on search depth
-        SEARCH_DEPTH_CONFIGS = {
-            "quick": {"max_companies": 50, "description": "50 companies max"},
-            "standard": {"max_companies": 100, "description": "100 companies max"},
-            "comprehensive": {"max_companies": 200, "description": "200 companies max"}
-        }
-        
+        # Use global search depth configuration
         config = SEARCH_DEPTH_CONFIGS.get(state.search_depth, SEARCH_DEPTH_CONFIGS["standard"])
         max_companies = config["max_companies"]
         
@@ -234,17 +230,66 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
     llm_duration = (llm_end - llm_start) * 1000
     print(f"⏱️  LLM extraction took: {llm_duration:.2f}ms ({llm_duration/1000:.2f}s)")
     
-    total_duration = (llm_end - serper_start) * 1000
+    # NEW: NEWS-BASED EXTRACTION
+    print("📰 Starting news-based company extraction...")
+    news_start = time.time()
+    
+    async def extract_news_companies():
+        try:
+            # Get news URLs for search strategies
+            news_urls = await get_news_urls_for_queries(
+                state.search_strategies_generated, 
+                max_parallel=state.max_parallel_searches
+            )
+            
+            # Use global search depth configuration
+            config = SEARCH_DEPTH_CONFIGS.get(state.search_depth, SEARCH_DEPTH_CONFIGS["standard"])
+            max_companies = config["max_companies"]
+            
+            if news_urls:
+                # Extract companies from news articles
+                news_companies = await extract_companies_from_news_urls(
+                    news_urls, 
+                    state.research_goal,
+                    max_parallel=state.max_parallel_searches  # Limit parallel scraping
+                )
+                
+                # Add news companies to existing list (avoiding duplicates)
+                for company in news_companies:
+                    if company.domain not in seen_domains:
+                        seen_domains.add(company.domain)
+                        extracted_companies.append(CompanyMeta(**company.dict()))
+                        
+                        # Stop if we've reached the company limit
+                        if len(extracted_companies) >= max_companies:
+                            logger.info(f"🎯 COMPANY AGGREGATOR: Reached company limit ({max_companies})")
+                            break
+                
+                print(f"📰 Added {len(news_companies)} companies from news articles")
+            else:
+                print("📰 No news URLs found")
+                
+        except Exception as e:
+            print(f"❌ News extraction failed: {e}")
+    
+    # Run the async news extraction
+    asyncio.run(extract_news_companies())
+    
+    news_end = time.time()
+    news_duration = (news_end - news_start) * 1000
+    print(f"⏱️  News extraction took: {news_duration:.2f}ms ({news_duration/1000:.2f}s)")
+    
+    total_duration = (news_end - serper_start) * 1000
     print(f"⏱️  Total time: {total_duration:.2f}ms ({total_duration/1000:.2f}s)")
 
     # ✅ Save to disk for debugging
     os.makedirs("debug_output", exist_ok=True)
     output_path = os.path.join("debug_output", "extracted_companies.json")
-    # try:
-    #     with open(output_path, "w", encoding="utf-8") as f:
-    #         json.dump([c.dict() for c in extracted_companies], f, ensure_ascii=False, indent=2)
-    #     print(f"📁 Saved extracted companies to {output_path}")
-    # except Exception as e:
-    #     print(f"⚠️ Failed to write extracted companies: {e}")
+    try:
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump([c.dict() for c in extracted_companies], f, ensure_ascii=False, indent=2)
+        print(f"📁 Saved extracted companies to {output_path}")
+    except Exception as e:
+        print(f"⚠️ Failed to write extracted companies: {e}")
 
     return state.model_copy(update={"extracted_companies": extracted_companies})

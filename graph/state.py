@@ -7,6 +7,10 @@ class CompanyMeta(BaseModel):
     domain: str = Field(..., description="Company's primary domain or website")
     source_url: Optional[str] = Field(None, description="URL where the company was found")
 
+class ExtractedCompany(BaseModel):
+    name: str = Field(..., description="Company name")
+    domain: str = Field(..., description="Company domain (e.g., stripe.com)")
+
 
 class CompanyFinding(BaseModel):
     domain: str = Field(..., description="Company domain (e.g., stripe.com)")
