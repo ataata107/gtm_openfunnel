@@ -3,11 +3,13 @@
 import asyncio
 import os
 import json
+import hashlib
 from typing import List
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 from graph.state import ExtractedCompany
 from dotenv import load_dotenv
+from utils.cache import cache
 
 import nest_asyncio
 from langchain_community.agent_toolkits import PlayWrightBrowserToolkit
@@ -79,6 +81,23 @@ async def extract_companies_from_news_queries(queries: List[str], research_goal:
         async def process_single_query(query: str):
             async with sem:
                 try:
+                    # Generate cache key for this specific query
+                    cache_key_data = {
+                        "query": query,
+                        "research_goal": research_goal,
+                        "search_depth": search_depth,
+                        "companies_per_query": companies_per_query
+                    }
+                    cache_key = f"news_companies:{hashlib.md5(json.dumps(cache_key_data, sort_keys=True).encode()).hexdigest()}"
+                    
+                    # Check cache first
+                    cached_companies = await cache.get(cache_key)
+                    if cached_companies:
+                        print(f"💾 NEWS EXTRACTOR: Cache hit for query: {query}")
+                        return cached_companies
+                    
+                    print(f"🔍 NEWS EXTRACTOR: Cache miss for query: {query}")
+                    
                     # Message to LLM with both news search and browser tools
                     message = f"""
                     Please search for news articles about companies relevant to this goal: {query}
@@ -112,6 +131,13 @@ async def extract_companies_from_news_queries(queries: List[str], research_goal:
                         if company.domain not in seen_domains:
                             unique_companies.append(company)
                             seen_domains.add(company.domain)
+                    
+                    # Cache the results
+                    try:
+                        await cache.set(cache_key, unique_companies, ttl=7200)  # Cache for 2 hours
+                        print(f"💾 NEWS EXTRACTOR: Cached companies for query: {query}")
+                    except Exception as e:
+                        print(f"⚠️ Failed to cache companies for query {query}: {e}")
                     
                     print(f"📰 Extracted {len(unique_companies)} companies from query: {query}")
                     return unique_companies

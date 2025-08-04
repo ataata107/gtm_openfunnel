@@ -4,9 +4,12 @@ from pydantic import BaseModel, Field
 from graph.state import GTMState
 from typing import List
 from dotenv import load_dotenv
+from utils.cache import cache
 import os
 import time
 import json
+import hashlib
+import asyncio
 
 load_dotenv()
 
@@ -25,6 +28,31 @@ def query_agent(state: GTMState) -> GTMState:
     print("🔍 QUERY AGENT: Starting search strategy generation...")
     print(f"📋 Research Goal: {state.research_goal}")
     print(f"🎯 Search Depth: {state.search_depth}")
+    
+    # Generate cache key based on research goal, search depth, and quality metrics
+    # For first run (no quality metrics), use simpler cache key
+    if not state.quality_metrics:
+        cache_key_data = {
+            "research_goal": state.research_goal,
+            "search_depth": state.search_depth,
+            "first_run": True
+        }
+    else:
+        cache_key_data = {
+            "research_goal": state.research_goal,
+            "search_depth": state.search_depth,
+            "quality_metrics": state.quality_metrics
+        }
+    cache_key = f"query_strategies:{hashlib.md5(json.dumps(cache_key_data, sort_keys=True).encode()).hexdigest()}"
+    
+    # Check cache first
+    cached_strategies = asyncio.run(cache.get(cache_key))
+    if cached_strategies:
+        print(f"💾 QUERY AGENT: Cache hit! Using cached search strategies")
+        print(f"⏱️  Total query agent time: 0.00ms (cached)")
+        return state.model_copy(update={"search_strategies_generated": cached_strategies})
+    
+    print(f"🔍 QUERY AGENT: Cache miss, generating new search strategies")
     
     # Check if we have quality metrics from previous iteration
     quality_metrics = state.quality_metrics or {}
@@ -173,5 +201,12 @@ Quality-driven guidelines:
         
     except Exception as e:
         print(f"⚠️ Failed to write search strategies: {e}")
+    
+    # Cache the generated strategies
+    try:
+        asyncio.run(cache.set(cache_key, response.search_strategies_generated, ttl=3600))  # Cache for 1 hour
+        print(f"💾 QUERY AGENT: Cached search strategies for future use")
+    except Exception as e:
+        print(f"⚠️ Failed to cache search strategies: {e}")
     
     return state.model_copy(update={"search_strategies_generated": response.search_strategies_generated})
