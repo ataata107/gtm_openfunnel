@@ -48,7 +48,7 @@ function App() {
         body: JSON.stringify({
           research_goal: researchGoal,
           search_depth: searchDepth,
-          max_parallel_searches: 150,
+          max_parallel_searches: 100,
           confidence_threshold: 0.8,
           max_iterations: 1
         })
@@ -245,9 +245,9 @@ function App() {
               onChange={(e) => setSearchDepth(e.target.value)}
               disabled={isLoading}
             >
-              <option value="quick">Quick (8 strategies, ~50 companies)</option>
-              <option value="standard">Standard (15 strategies, ~100 companies)</option>
-              <option value="comprehensive">Comprehensive (25 strategies, ~200 companies)</option>
+              <option value="quick">Quick (5 strategies, ~50 companies)</option>
+              <option value="standard">Standard (10 strategies, ~100 companies)</option>
+              <option value="comprehensive">Comprehensive (15 strategies, ~200 companies)</option>
             </select>
           </div>
 

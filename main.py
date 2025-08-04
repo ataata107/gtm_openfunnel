@@ -23,11 +23,32 @@ def main():
     print(f"🎯 Confidence Threshold: {initial_state.confidence_threshold}")
     print("=" * 60)
     
-    # Run the graph
-    result = graph.invoke(initial_state)
-    
-    print("\n" + "=" * 60)
-    print("✅ Research Pipeline Completed!")
+    # Run the graph with error handling
+    try:
+        result = graph.invoke(initial_state)
+        print("\n" + "=" * 60)
+        print("✅ Research Pipeline Completed!")
+    except Exception as e:
+        print(f"\n❌ Research Pipeline Error: {e}")
+        print("🔄 Attempting to recover...")
+        
+        # Try to get partial results if available
+        try:
+            # Check if we have any saved results
+            import os
+            import json
+            
+            if os.path.exists("debug_output/final_findings.json"):
+                with open("debug_output/final_findings.json", "r") as f:
+                    findings = json.load(f)
+                print(f"📊 Recovered {len(findings)} findings from debug output")
+                result = {"final_findings": findings}
+            else:
+                print("⚠️ No debug output available for recovery")
+                result = {}
+        except Exception as recovery_error:
+            print(f"❌ Recovery failed: {recovery_error}")
+            result = {}
     
     # Handle both dict and GTMState objects
     if isinstance(result, dict):

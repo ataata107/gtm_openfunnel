@@ -4,7 +4,6 @@ from agents.query_agent import query_agent
 from agents.company_aggregator_agent import company_aggregator_agent
 from agents.multi_source_search_agent import multi_source_search_agent
 from agents.website_scraper_agent import website_scraper_agent  # ✅ New
-from agents.evaluator_agent import evaluator_agent
 from agents.quality_evaluator_agent import quality_evaluator_agent
 from agents.strategy_refinement_agent import strategy_refinement_agent
 
@@ -16,7 +15,6 @@ def build_gtm_graph():
     builder.add_node("CompanyAggregatorAgent", company_aggregator_agent)
     builder.add_node("SearchAgent", multi_source_search_agent)
     builder.add_node("WebsiteScraperAgent", website_scraper_agent)  # ✅ Added
-    builder.add_node("EvaluatorAgent", evaluator_agent)
     builder.add_node("QualityEvaluatorAgent", quality_evaluator_agent)
     builder.add_node("StrategyRefinementAgent", strategy_refinement_agent)
 
@@ -28,9 +26,7 @@ def build_gtm_graph():
     builder.add_edge("QueryAgent", "CompanyAggregatorAgent")
     builder.add_edge("CompanyAggregatorAgent", "SearchAgent")
     # builder.add_edge("SearchAgent", "WebsiteScraperAgent")
-    # builder.add_edge("WebsiteScraperAgent", "EvaluatorAgent")
-    builder.add_edge("SearchAgent", "EvaluatorAgent")
-    builder.add_edge("EvaluatorAgent", "QualityEvaluatorAgent")
+    builder.add_edge("SearchAgent", "QualityEvaluatorAgent")
 
     # Feedback loop: If quality is low, loop back to search with refined strategies
     def should_continue_research(state):

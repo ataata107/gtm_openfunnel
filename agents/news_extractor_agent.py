@@ -8,51 +8,91 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 from graph.state import ExtractedCompany
 from dotenv import load_dotenv
-import logging
+
 import nest_asyncio
 from langchain_community.agent_toolkits import PlayWrightBrowserToolkit
 from langchain_community.tools.playwright.utils import create_async_playwright_browser
+from langchain_community.utilities import GoogleSerperAPIWrapper
+from langchain_community.tools import Tool
 
 load_dotenv()
 nest_asyncio.apply()
 
-# Configure logging
-logger = logging.getLogger(__name__)
+
+
+SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+
+# Global search depth configuration - same as company_aggregator_agent
+SEARCH_DEPTH_CONFIGS = {
+    "quick": {"num_results": 10, "companies_per_query": 20, "max_companies": 50, "description": "10 results per search, 10 companies per query, 50 companies max"},
+    "standard": {"num_results": 20, "companies_per_query": 20, "max_companies": 100, "description": "20 results per search, 10 companies per query, 100 companies max"},
+    "comprehensive": {"num_results": 30, "companies_per_query": 28, "max_companies": 200, "description": "30 results per search, 14 companies per query, 200 companies max"}
+}
 
 class CompanyExtractionOutput(BaseModel):
     companies: List[ExtractedCompany]
 
-# Global LLM setup (browser will be created per function call)
-llm = ChatOpenAI(model="gpt-4o-mini")
+# Global LLM setup with both Serper news and Playwright tools
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
-async def extract_companies_from_news_urls(news_urls: List[str], research_goal: str, max_parallel: int = 3) -> List[ExtractedCompany]:
-    """Extract companies from multiple news URLs using simple LLM with tools binding"""
+# Create Serper news search wrapper and tool
+news_search = GoogleSerperAPIWrapper(serper_api_key=SERPER_API_KEY, type="news")
+news_search_tool = Tool(
+    name="news_search",
+    func=news_search.run,
+    description="Search for recent news articles using Serper news API. Use this to find news articles about companies relevant to the research goal."
+)
+
+llm_with_output = llm.with_structured_output(CompanyExtractionOutput)
+
+async def extract_companies_from_news_queries(queries: List[str], research_goal: str, search_depth: str = "standard", max_parallel: int = 3) -> List[ExtractedCompany]:
+    """Extract companies from news using LLM with Serper news search and Playwright tools"""
     all_companies = []
     seen_domains = set()
+    
+    # Configure search depth
+    config = SEARCH_DEPTH_CONFIGS.get(search_depth, SEARCH_DEPTH_CONFIGS["standard"])
+    companies_per_query = config["companies_per_query"]
+    max_companies = config["max_companies"]
+    
+    print(f"📰 NEWS EXTRACTOR: Using {search_depth} search depth")
+    print(f"📊 Target: {companies_per_query} companies per query, {max_companies} max total")
     
     # Create browser and tools within the function scope
     async_browser = create_async_playwright_browser(headless=True)
     toolkit = PlayWrightBrowserToolkit.from_browser(async_browser=async_browser)
-    all_tools = toolkit.get_tools()
+    browser_tools = toolkit.get_tools()
     
+    # Combine Serper news tool with browser tools
+    all_tools = [news_search_tool] + browser_tools
     llm_with_tools = llm.bind_tools(all_tools)
-    llm_with_output = llm.with_structured_output(CompanyExtractionOutput)
     
     try:
-        # Process URLs in batches
+        # Process queries in batches
         sem = asyncio.Semaphore(max_parallel)
         
-        async def process_single_url(url: str):
+        async def process_single_query(query: str):
             async with sem:
                 try:
-                    # Simple message to the LLM with tools
+                    # Message to LLM with both news search and browser tools
                     message = f"""
-                    Please visit {url} and extract all companies relevant to this research goal: {research_goal}
+                    Please search for news articles about companies relevant to this goal: {research_goal}
                     
-                    Return a list of companies with name and domain you are able to find for certainity. Focus on companies that match the research objective only.
+                    Use the news_search tool to find recent news article links about companies satisfying the goal.
+                    Then use the browser tools to visit the links and extract company information.
+                    
+                    IMPORTANT: Extract atmost {companies_per_query} companies from the news article links. Be comprehensive and thorough.
+                    Include companies that are:
+                    - Directly relevant to the goal
+                    - Competitors or similar companies mentioned in articles
+                    - Companies featured in news, lists, or comparisons
+                    - Companies mentioned in quotes, interviews, or case studies
+                    
+                    Return atmost {companies_per_query} companies with their names and domains.
+                    Focus on quality and relevance over quantity.
                     """
                     
-                    # Let the LLM use the browser tools directly
+                    # Let the LLM use both tools directly
                     response = await llm_with_output.ainvoke(message)
                     companies = response.companies
                     
@@ -63,20 +103,31 @@ async def extract_companies_from_news_urls(news_urls: List[str], research_goal: 
                             unique_companies.append(company)
                             seen_domains.add(company.domain)
                     
-                    print(f"📰 Extracted {len(unique_companies)} companies from {url}")
+                    # print(f"📰 Extracted {len(unique_companies)} companies from query: {query}")
                     return unique_companies
                     
                 except Exception as e:
-                    print(f"❌ Failed to process {url}: {e}")
+                    print(f"❌ Failed to process query {query}: {e}")
                     return []
         
-        # Process all URLs
-        tasks = [process_single_url(url) for url in news_urls]
+        # Process all queries
+        tasks = [process_single_query(query) for query in queries]
         results = await asyncio.gather(*tasks)
         
-        # Combine all results
+        # Combine all results with limit check
         for companies in results:
-            all_companies.extend(companies)
+            for company in companies:
+                
+                all_companies.append(company)
+                
+                
+                # Stop if we've reached the company limit
+                if len(all_companies) >= max_companies:
+                    print(f"🎯 NEWS EXTRACTOR: Reached company limit ({max_companies})")
+                    break
+            # Stop if we've reached the company limit
+            if len(all_companies) >= max_companies:
+                break
         
         print(f"📰 Total companies extracted from news: {len(all_companies)}")
         

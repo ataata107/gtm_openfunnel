@@ -5,46 +5,51 @@ from graph.state import GTMState
 from typing import List
 from dotenv import load_dotenv
 import os
-import logging
+import time
+import json
 
 load_dotenv()
 
-# Configure logging
-logger = logging.getLogger(__name__)
+
 
 class QueryStrategyOutput(BaseModel):
     search_strategies_generated: List[str] = Field(..., description="List of search strategies for research")
 
+# Global LLM instance for reuse - initialized once
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+structured_llm = llm.with_structured_output(QueryStrategyOutput)
+
 
 def query_agent(state: GTMState) -> GTMState:
-    logger.info("🔍 QUERY AGENT: Starting search strategy generation...")
-    logger.info(f"📋 Research Goal: {state.research_goal}")
-    logger.info(f"🎯 Search Depth: {state.search_depth}")
+    total_start_time = time.time()
+    print("🔍 QUERY AGENT: Starting search strategy generation...")
+    print(f"📋 Research Goal: {state.research_goal}")
+    print(f"🎯 Search Depth: {state.search_depth}")
     
     # Check if we have quality metrics from previous iteration
     quality_metrics = state.quality_metrics or {}
     has_quality_feedback = bool(quality_metrics)
     
     if has_quality_feedback:
-        logger.info("🎯 QUERY AGENT: Using quality metrics to improve search strategies")
-        logger.info(f"📊 Previous Quality Score: {quality_metrics.get('quality_score', 0):.2f}")
-        logger.info(f"📊 Previous Coverage Score: {quality_metrics.get('coverage_score', 0):.2f}")
+        print("🎯 QUERY AGENT: Using quality metrics to improve search strategies")
+        print(f"📊 Previous Quality Score: {quality_metrics.get('quality_score', 0):.2f}")
+        print(f"📊 Previous Coverage Score: {quality_metrics.get('coverage_score', 0):.2f}")
     
-    # Configure search depth
+    # Configure search depth - optimized for faster execution
     SEARCH_DEPTH_CONFIGS = {
-        "quick": {"strategies": 8, "description": "8 focused search strategies"},
-        "standard": {"strategies": 15, "description": "15 diverse search strategies"},
-        "comprehensive": {"strategies": 25, "description": "25 comprehensive search strategies"}
+        "quick": {"strategies": 5, "description": "5 focused search strategies"},
+        "standard": {"strategies": 10, "description": "10 diverse search strategies"},
+        "comprehensive": {"strategies": 15, "description": "15 comprehensive search strategies"}
     }
     
     config = SEARCH_DEPTH_CONFIGS.get(state.search_depth, SEARCH_DEPTH_CONFIGS["standard"])
     num_strategies = config["strategies"]
     
-    logger.info(f"🎯 QUERY AGENT: Generating {config['description']}")
+    print(f"🎯 QUERY AGENT: Generating {config['description']}")
     
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
-    structured_llm = llm.with_structured_output(QueryStrategyOutput)
-
+    # Time quality feedback preparation
+    feedback_start_time = time.time()
+    
     # Prepare quality feedback text if available
     quality_feedback_text = ""
     if has_quality_feedback:
@@ -79,75 +84,87 @@ RECOMMENDATIONS FROM THIS RESEARCH:
 
 IMPORTANT: Use this quality feedback to generate more targeted search strategies that address the specific gaps and issues identified above.
 """
+    
+    feedback_prep_time = (time.time() - feedback_start_time) * 1000
+    print(f"⏱️  Quality feedback preparation took: {feedback_prep_time:.2f}ms")
 
     prompt = PromptTemplate.from_template(
-        """You are a research strategist specializing in web search optimization.
-
-Your task is to generate {num_strategies} different search strategies for the following research goal. Each strategy should restructure the research goal in a unique way to find different types of information.
-
-Research goal: {research_goal}{quality_feedback}
-
-Generate {num_strategies} diverse search strategies that:
-1. Use different keywords and phrases related to the research goal
-2. Target different information sources (**news**, company websites, technical blogs, job boards, etc.)
-3. Focus on different aspects (technology, business, implementation, market, etc.)
-4. Use various search techniques (quotes, site-specific, date ranges, etc.)
-5. Target different stakeholders (developers, executives, analysts, customers, etc.)
-
-Strategy generation guidelines:
-- Break down the research goal into different components and keywords
-- Create variations that focus on different aspects of the goal
-- Include industry-specific terms and jargon
-- Use different search operators and techniques
-- Target both broad and specific search terms
-- Consider different time periods and contexts
-- Include both technical and business perspectives
+        """Generate {num_strategies} diverse search strategies for: {research_goal}{quality_feedback}
 
 {quality_guidance}
 
-Examples of strategy types (adapt these to your specific research goal):
-- Technology-focused: Focus on specific technologies, tools, or technical implementations
-- Company-focused: Target specific companies or competitors
-- Implementation-focused: Look for implementation details, APIs, or technical guides
-- News-focused: Search for recent news, announcements, or developments
-- Technical-focused: Focus on technical documentation, algorithms, or methodologies
-- Business-focused: Look for business cases, market analysis, or industry trends
-- Product-focused: Search for product features, capabilities, or solutions
-- Industry-focused: Target industry-specific terms and contexts
-- Case study-focused: Look for success stories, case studies, or examples
-- Competitive-focused: Search for market leaders, competitors, or industry analysis
+Strategy types to adapt:
+- Technology: specific tools, implementations
+- Company: competitors, market leaders  
+- News: recent announcements, developments
+- Technical: documentation, methodologies
+- Business: market analysis, trends
+- Product: features, capabilities
+- Case studies: success stories, examples
 
-Return exactly {num_strategies} search strategies as the 'search_strategies_generated' field of a Pydantic model. 
+Return exactly {num_strategies} search strategies as 'search_strategies_generated'.
 """
     )
 
     # Prepare quality guidance based on whether we have feedback
     if has_quality_feedback:
         quality_guidance = """
-IMPORTANT QUALITY-DRIVEN GUIDELINES:
-- Focus on strategies that address the specific missing aspects identified
-- Prioritize searches that target the coverage gaps mentioned
-- Generate strategies that use more reliable data sources (address evidence issues)
-- Include strategies that follow the recommendations from previous research
-- If quality score was low, focus on more specific and targeted searches
-- If coverage score was low, focus on broader and more diverse searches
-- If evidence issues were identified, prioritize searches for recent, specific, and well-documented information
+Quality-driven guidelines:
+- Address missing aspects and coverage gaps
+- Use reliable data sources
+- Follow previous recommendations
+- Low quality score: more specific searches
+- Low coverage score: broader searches
+- Evidence issues: recent, specific information
 """
     else:
         quality_guidance = ""
 
+    # Time prompt formatting
+    prompt_start_time = time.time()
     input_text = prompt.format(
         research_goal=state.research_goal,
         quality_feedback=quality_feedback_text,
         quality_guidance=quality_guidance,
         num_strategies=num_strategies
     )
+    prompt_format_time = (time.time() - prompt_start_time) * 1000
+    print(f"⏱️  Prompt formatting took: {prompt_format_time:.2f}ms")
     
-    logger.info("🤖 QUERY AGENT: Invoking LLM for strategy generation...")
+    # Time LLM invocation
+    llm_invoke_start_time = time.time()
+    print("🤖 QUERY AGENT: Invoking LLM for strategy generation...")
     response: QueryStrategyOutput = structured_llm.invoke(input_text)
+    llm_invoke_time = (time.time() - llm_invoke_start_time) * 1000
+    print(f"⏱️  LLM invocation took: {llm_invoke_time:.2f}ms")
 
-    logger.info(f"✅ QUERY AGENT: Generated {len(response.search_strategies_generated)} search strategies")
+    # Calculate total time
+    total_time = (time.time() - total_start_time) * 1000
+    print(f"⏱️  Total query agent time: {total_time:.2f}ms ({total_time/1000:.2f}s)")
+    
+    print(f"✅ QUERY AGENT: Generated {len(response.search_strategies_generated)} search strategies")
     if has_quality_feedback:
-        logger.info("🎯 QUERY AGENT: Strategies generated with quality feedback integration")
+        print("🎯 QUERY AGENT: Strategies generated with quality feedback integration")
+    
+    # Save search strategies to debug file
+    try:
+        os.makedirs("debug_output", exist_ok=True)
+        output_path = os.path.join("debug_output", "search_strategies.json")
+        
+        strategies_data = {
+            "research_goal": state.research_goal,
+            "search_depth": state.search_depth,
+            "num_strategies": len(response.search_strategies_generated),
+            "strategies": response.search_strategies_generated,
+            "quality_feedback_used": has_quality_feedback,
+            "timestamp": time.time()
+        }
+        
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(strategies_data, f, ensure_ascii=False, indent=2)
+        print(f"📁 Saved search strategies to {output_path}")
+        
+    except Exception as e:
+        print(f"⚠️ Failed to write search strategies: {e}")
     
     return state.model_copy(update={"search_strategies_generated": response.search_strategies_generated})

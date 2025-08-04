@@ -1,7 +1,8 @@
 import uuid
 import time
 import asyncio
-import logging
+import json
+import re
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -9,12 +10,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
 
+def clean_json_string(text: str) -> str:
+    """Clean string for safe JSON serialization"""
+    if not isinstance(text, str):
+        return str(text)
+    
+    # Remove null bytes and control characters
+    text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
+    
+    # Replace problematic characters
+    text = text.replace('\r', ' ').replace('\n', ' ')
+    
+    # Remove any trailing incomplete UTF-8 sequences
+    text = text.encode('utf-8', errors='ignore').decode('utf-8')
+    
+    return text.strip()
+
 from graph.gtm_graph import build_gtm_graph
 from graph.state import GTMState, CompanyFinding, PerformanceStats
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -72,14 +85,14 @@ async def execute_research(research_id: str, request: ResearchRequest):
         # Update session status
         research_sessions[research_id]["status"] = "processing"
         research_sessions[research_id]["current_step"] = "Initializing research workflow"
-        logger.info(f"🚀 Starting research for {research_id}: {request.research_goal}")
+        print(f"🚀 Starting research for {research_id}: {request.research_goal}")
         
         # Build and execute GTM graph
-        logger.info("🔧 Building GTM graph...")
+        print("🔧 Building GTM graph...")
         gtm_workflow = build_gtm_graph()
         
         # Create initial state
-        logger.info("📝 Creating initial state...")
+        print("📝 Creating initial state...")
         initial_state = GTMState(
             research_goal=request.research_goal,
             search_depth=request.search_depth,
@@ -89,18 +102,18 @@ async def execute_research(research_id: str, request: ResearchRequest):
         )
         
         research_sessions[research_id]["current_step"] = "Executing research workflow"
-        logger.info("🔄 Executing GTM workflow...")
+        print("🔄 Executing GTM workflow...")
         
         # Execute the workflow with detailed logging
-        logger.info("=" * 60)
-        logger.info("🎯 GTM RESEARCH WORKFLOW EXECUTION")
-        logger.info("=" * 60)
+        print("=" * 60)
+        print("🎯 GTM RESEARCH WORKFLOW EXECUTION")
+        print("=" * 60)
         
         final_state = gtm_workflow.invoke(initial_state)
         
         # Calculate processing time
         processing_time_ms = int((time.time() - start_time) * 1000)
-        logger.info(f"⏱️ Total processing time: {processing_time_ms}ms")
+        print(f"⏱️ Total processing time: {processing_time_ms}ms")
         
         # Extract results
         if isinstance(final_state, dict):
@@ -115,21 +128,21 @@ async def execute_research(research_id: str, request: ResearchRequest):
             performance = getattr(final_state, "performance", {})
         
         # Log detailed results
-        logger.info("📊 RESEARCH RESULTS SUMMARY")
-        logger.info("=" * 40)
-        logger.info(f"🔍 Search Strategies Generated: {len(search_strategies) if search_strategies else 0}")
-        logger.info(f"🏢 Companies Extracted: {len(companies) if companies else 0}")
-        logger.info(f"📋 Final Findings: {len(findings) if findings else 0}")
+        print("📊 RESEARCH RESULTS SUMMARY")
+        print("=" * 40)
+        print(f"🔍 Search Strategies Generated: {len(search_strategies) if search_strategies else 0}")
+        print(f"🏢 Companies Extracted: {len(companies) if companies else 0}")
+        print(f"📋 Final Findings: {len(findings) if findings else 0}")
         
         if companies:
-            logger.info("🏢 Extracted Companies:")
+            print("🏢 Extracted Companies:")
             for company in companies:
-                logger.info(f"   - {company.name} ({company.domain})")
+                print(f"   - {company.name} ({company.domain})")
         
         if findings:
-            logger.info("📋 Company Findings:")
+            print("📋 Company Findings:")
             for finding in findings:
-                logger.info(f"   - {finding.domain}: {finding.confidence_score:.2f} confidence")
+                print(f"   - {finding.domain}: {finding.confidence_score:.2f} confidence")
         
         # Calculate metrics
         total_companies = len(companies) if companies else 0
@@ -147,22 +160,58 @@ async def execute_research(research_id: str, request: ResearchRequest):
         total_searches += sum(len(snippets) for snippets in serper_results.values())
         total_searches += sum(len(snippets) for snippets in website_results.values())
         
-        logger.info(f"🔍 Total Searches Executed: {total_searches}")
+        print(f"🔍 Total Searches Executed: {total_searches}")
         
         # Extract company domains
         company_domains = [company.domain for company in companies] if companies else []
         
-        # Format results
+        # Format results with proper JSON handling
         formatted_results = []
         for finding in findings:
-            formatted_result = {
-                "domain": finding.domain,
-                "confidence_score": finding.confidence_score,
-                "evidence_sources": finding.evidence_sources,
-                "findings": finding.findings,
-                "signals_found": finding.signals_found
-            }
-            formatted_results.append(formatted_result)
+            try:
+                # Clean and validate the findings data
+                findings_data = finding.findings
+                if isinstance(findings_data, dict):
+                    # Ensure all string values are properly encoded
+                    cleaned_findings = {}
+                    for key, value in findings_data.items():
+                        if isinstance(value, str):
+                            # Clean any problematic characters
+                            cleaned_value = clean_json_string(value)
+                            cleaned_findings[key] = cleaned_value
+                        elif isinstance(value, list):
+                            # Clean list items
+                            cleaned_list = []
+                            for item in value:
+                                if isinstance(item, str):
+                                    cleaned_item = clean_json_string(item)
+                                    cleaned_list.append(cleaned_item)
+                                else:
+                                    cleaned_list.append(item)
+                            cleaned_findings[key] = cleaned_list
+                        else:
+                            cleaned_findings[key] = value
+                else:
+                    cleaned_findings = findings_data
+                
+                formatted_result = {
+                    "domain": finding.domain,
+                    "confidence_score": finding.confidence_score,
+                    "evidence_sources": finding.evidence_sources,
+                    "findings": cleaned_findings,
+                    "signals_found": finding.signals_found
+                }
+                formatted_results.append(formatted_result)
+            except Exception as e:
+                print(f"⚠️ Error formatting finding for {finding.domain}: {e}")
+                # Add a safe fallback
+                formatted_results.append({
+                    "domain": finding.domain,
+                    "confidence_score": finding.confidence_score,
+                    "evidence_sources": finding.evidence_sources,
+                    "findings": {"error": "Data formatting issue"},
+                    "signals_found": finding.signals_found
+                })
         
         # Calculate performance metrics
         search_performance = {
@@ -171,32 +220,64 @@ async def execute_research(research_id: str, request: ResearchRequest):
             "failed_requests": performance.get("failed_requests", 0)
         }
         
-        logger.info("📈 PERFORMANCE METRICS")
-        logger.info("=" * 30)
-        logger.info(f"⏱️ Processing Time: {processing_time_ms}ms")
-        logger.info(f"🔍 Queries/Second: {search_performance['queries_per_second']}")
-        logger.info(f"💾 Cache Hit Rate: {search_performance['cache_hit_rate']}")
-        logger.info(f"❌ Failed Requests: {search_performance['failed_requests']}")
+        print("📈 PERFORMANCE METRICS")
+        print("=" * 30)
+        print(f"⏱️ Processing Time: {processing_time_ms}ms")
+        print(f"🔍 Queries/Second: {search_performance['queries_per_second']}")
+        print(f"💾 Cache Hit Rate: {search_performance['cache_hit_rate']}")
+        print(f"❌ Failed Requests: {search_performance['failed_requests']}")
         
-        # Update session with results
-        research_sessions[research_id].update({
-            "status": "completed",
-            "total_companies": total_companies,
-            "search_strategies_generated": search_strategies_count,
-            "total_searches_executed": total_searches,
-            "processing_time_ms": processing_time_ms,
-            "company_domains": company_domains,
-            "results": formatted_results,
-            "search_performance": search_performance,
-            "updated_at": datetime.utcnow().isoformat()
-        })
+        # Update session with results (with JSON safety)
+        try:
+            # Test JSON serialization before saving
+            import json
+            test_json = json.dumps({
+                "status": "completed",
+                "total_companies": total_companies,
+                "search_strategies_generated": search_strategies_count,
+                "total_searches_executed": total_searches,
+                "processing_time_ms": processing_time_ms,
+                "company_domains": company_domains,
+                "results": formatted_results,
+                "search_performance": search_performance,
+                "updated_at": datetime.utcnow().isoformat()
+            }, ensure_ascii=False, default=str)
+            
+            # If JSON serialization succeeds, update the session
+            research_sessions[research_id].update({
+                "status": "completed",
+                "total_companies": total_companies,
+                "search_strategies_generated": search_strategies_count,
+                "total_searches_executed": total_searches,
+                "processing_time_ms": processing_time_ms,
+                "company_domains": company_domains,
+                "results": formatted_results,
+                "search_performance": search_performance,
+                "updated_at": datetime.utcnow().isoformat()
+            })
+            
+        except Exception as e:
+            print(f"❌ JSON serialization error: {e}")
+            # Save a minimal response without problematic data
+            research_sessions[research_id].update({
+                "status": "completed",
+                "total_companies": total_companies,
+                "search_strategies_generated": search_strategies_count,
+                "total_searches_executed": total_searches,
+                "processing_time_ms": processing_time_ms,
+                "company_domains": company_domains,
+                "results": [],  # Empty results to avoid JSON issues
+                "search_performance": search_performance,
+                "updated_at": datetime.utcnow().isoformat(),
+                "error": "JSON serialization issue - results saved to debug files"
+            })
         
-        logger.info("✅ Research completed successfully!")
-        logger.info("=" * 60)
+        print("✅ Research completed successfully!")
+        print("=" * 60)
         
     except Exception as e:
-        logger.error(f"❌ Research failed: {str(e)}")
-        logger.error(f"Error details: {type(e).__name__}: {e}")
+        print(f"❌ Research failed: {str(e)}")
+        print(f"Error details: {type(e).__name__}: {e}")
         research_sessions[research_id].update({
             "status": "failed",
             "error": str(e),
@@ -208,12 +289,12 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
     """Start a new research batch"""
     research_id = str(uuid.uuid4())
     
-    logger.info(f"🚀 New research request: {research_id}")
-    logger.info(f"📋 Research Goal: {request.research_goal}")
-    logger.info(f"🔍 Search Depth: {request.search_depth}")
-    logger.info(f"⚡ Max Parallel Searches: {request.max_parallel_searches}")
-    logger.info(f"🎯 Confidence Threshold: {request.confidence_threshold}")
-    
+    print(f"🚀 New research request: {research_id}")
+    print(f"📋 Research Goal: {request.research_goal}")
+    print(f"🔍 Search Depth: {request.search_depth}")
+    print(f"⚡ Max Parallel Searches: {request.max_parallel_searches}")
+    print(f"🎯 Confidence Threshold: {request.confidence_threshold}")
+
     # Initialize session
     research_sessions[research_id] = {
         "research_id": research_id,

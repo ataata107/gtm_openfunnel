@@ -16,14 +16,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
-import logging
+
 
 from graph.gtm_graph import build_gtm_graph
 from graph.state import GTMState
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
 
 app = FastAPI(title="GTM Intelligence API", version="1.0.0")
 
@@ -83,7 +81,7 @@ def log_message(message: str, level: str = "info"):
         try:
             callback(log_entry)
         except Exception as e:
-            logger.error(f"Error in log callback: {e}")
+            print(f"Error in log callback: {e}")
 
 # Custom stdout capture for agent logs with real-time streaming
 class LogCapture:
@@ -393,7 +391,7 @@ async def start_research(request: ResearchRequest):
         )
         
     except Exception as e:
-        logger.error(f"Research failed: {str(e)}")
+        print(f"Research failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Research failed: {str(e)}")
 
 if __name__ == "__main__":

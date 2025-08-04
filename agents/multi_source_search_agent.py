@@ -3,14 +3,13 @@
 import asyncio
 import os
 import json
-import requests
 from typing import List, Dict, Any
-from graph.state import GTMState
+from graph.state import GTMState, CompanyFinding
 from langchain_openai import ChatOpenAI
-from langchain.prompts import PromptTemplate
 from pydantic import BaseModel, Field
-from utils.connection_pool import connection_pool
 from utils.cache import cache
+from langchain_community.utilities import GoogleSerperAPIWrapper
+from langchain_community.tools import Tool
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -18,45 +17,40 @@ load_dotenv()
 
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
-# Structured output for search queries
-class SearchQueriesOutput(BaseModel):
-    queries: List[str] = Field(..., description="List of 3 highly targeted search queries for finding evidence about the company")
-    reasoning: str = Field(..., description="Brief explanation of why these queries were chosen")
-    #search_focus: str = Field(..., description="Primary focus area for these queries (e.g., 'case studies', 'technical details', 'user reviews')")
+# Structured output for evaluation
+class EvaluationOutput(BaseModel):
+    goal_achieved: bool = Field(..., description="Whether the company meets the research goal criteria")
+    technologies: List[str] = Field(..., description="Relevant technologies, tools, or capabilities mentioned")
+    evidences: List[str] = Field(..., description="Relevant text snippets supporting the findings upto a max of 5")
+    confidence_level: str = Field(..., description="High/Medium/Low confidence in the assessment")
 
-# LLM-based query builder with structured output
-class LLMQueryBuilder:
-    def __init__(self):
-        self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
-        self.structured_llm = self.llm.with_structured_output(SearchQueriesOutput)
-        self.prompt = PromptTemplate.from_template("""
-You are an expert search query builder for GTM research. Your task is to generate 3 highly targeted search queries for finding evidence about a specific company about a research goal.
-Remember to add the company name in the queries for a company targeted search.
+# Global LLM with Serper tools for direct extraction
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
-Company Information:
-- Name: {company_name}
-- Domain: {domain}
+# Create Serper search wrapper and tool
+search = GoogleSerperAPIWrapper(serper_api_key=SERPER_API_KEY)
+serper_tool = Tool(
+    name="search",
+    func=search.run,
+    description="Search the web using Serper to find information about companies relevant to the research goal."
+)
 
-Research Goal: {research_goal}
+llm_with_tools = llm.bind_tools([serper_tool])
+llm_with_output = llm.with_structured_output(EvaluationOutput)
 
-{company_feedback}
-
-Instructions:
-1. Generate 3 search queries that will find the most relevant evidence
-2. Use specific, targeted terms that match the research goal
-3. Include both company-specific and domain-specific variations
-4. Use advanced search operators when helpful (site:, "quotes", AND, OR, etc.)
-5. Focus on finding concrete evidence, not just general information
-6. Ensure queries are diverse in their approach (case studies, technical details, user reviews, etc.)
-7. If quality feedback is available, prioritize queries that address the specific gaps and issues identified
-
-Return a structured response with:
-- queries: List of 3 search queries with company name in the queries
-- reasoning: Brief explanation of your query strategy
-""")
-
-    async def build_queries_async(self, company_name: str, domain: str, research_goal: str, quality_metrics: dict = None) -> List[str]:
-        """Build queries asynchronously using ainvoke with quality feedback"""
+async def evaluate_company_with_serper_tool(company_name: str, domain: str, research_goal: str, quality_metrics: dict = None, search_depth: str = "standard") -> CompanyFinding:
+    """Evaluate a company directly using LLM with Serper tools"""
+    try:
+        # Configure search depth based on search_depth parameter
+        search_depth_configs = {
+            "quick": {"num_results": 10, "description": "Quick search with 10 results"},
+            "standard": {"num_results": 20, "description": "Standard search with 20 results"},
+            "comprehensive": {"num_results": 30, "description": "Comprehensive search with 30 results"}
+        }
+        
+        config = search_depth_configs.get(search_depth, search_depth_configs["standard"])
+        search.k = config["num_results"]
+        # print(f"🔍 Using {search_depth} search depth: {config['description']}")
         
         # Get company-specific quality feedback
         company_feedback = ""
@@ -91,101 +85,62 @@ EVIDENCE ISSUES FOR THIS COMPANY:
 RECOMMENDATIONS FOR THIS COMPANY:
 {recs_text}
 
-IMPORTANT: Use this feedback to generate more targeted queries that address the specific gaps and issues for this company.
+IMPORTANT: Use this feedback to focus your search on addressing the specific gaps and issues for this company.
 """
                     break
         
-        prompt_input = {
-            "company_name": company_name,
-            "domain": domain,
-            "research_goal": research_goal,
-            "company_feedback": company_feedback
-        }
+        # Create comprehensive search message using research goal and quality feedback
+        message = f"""
+        Please search for and evaluate information about {company_name} ({domain}) regarding this goal: {research_goal}
         
-        try:
-            structured_response = await self.structured_llm.ainvoke(self.prompt.format(**prompt_input))
-            queries = structured_response.queries
-            
-            if not queries:
-                queries = [f"{company_name} {research_goal}", f"{domain} {research_goal}", f"{company_name} site:{domain} {research_goal}"]
-            
-            # Enhance queries: ensure company name is included if not present
-            enhanced_queries = []
-            for query in queries:
-                # Check if company name or domain is already in the query
-                company_in_query = (
-                    company_name.lower() in query.lower() or 
-                    domain.lower() in query.lower() or
-                    company_name.split()[0].lower() in query.lower()  # Check first word of company name
-                )
-                
-                if not company_in_query:
-                    # Add company name to the beginning of the query
-                    enhanced_query = f"{company_name} {query}"
-                    enhanced_queries.append(enhanced_query)
-                else:
-                    enhanced_queries.append(query)
-            
-            # print(f"🤖 LLM generated {len(enhanced_queries)} queries for {company_name}")
-            # print(f"   Focus: {structured_response.search_focus}")
-            # print(f"   Reasoning: {structured_response.reasoning}")
-            # print(f"   Original Queries: {queries}")
-            # print(f"   Enhanced Queries: {enhanced_queries}")
-            
-            return enhanced_queries[:5]
-            
-        except Exception as e:
-            print(f"❌ LLM query generation failed for {company_name}: {e}")
-            # Fallback queries always include company name
-            fallback_queries = [
-                f"{company_name} {research_goal}", 
-                f"{domain} {research_goal}", 
-                f"{company_name} site:{domain} {research_goal}",
-                f"{company_name} company {research_goal}",
-                f"{company_name} technology {research_goal}"
-            ]
-            return fallback_queries[:5]
-
-# Initialize the LLM query builder
-llm_query_builder = LLMQueryBuilder()
-
-async def run_serper(query: str, sem: asyncio.Semaphore):
-    """Run Serper search with connection pooling"""
-    async with sem:
-        try:
-            # Check cache first
-            cached_results = await cache.get_search_results(query, "serper")
-            if cached_results:
-                print(f"✅ Cache hit for query: {query}")
-                return query, cached_results, "cache"
-            
-            # Use connection pooling for API call
-            response = await _make_serper_request(query)
-            
-            # Cache the results
-            await cache.set_search_results(query, "serper", response, ttl=7200)
-            return query, response, "api"
-            
-        except Exception as e:
-            print(f"❌ Serper search failed for '{query}': {e}")
-            return query, [], "failed"
-
-async def _make_serper_request(query: str) -> List[str]:
-    """Make Serper API request using requests"""
-    url = "https://google.serper.dev/search"
-    headers = {"X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json"}
-    payload = {"q": query, "num": 10}
-    
-    # Use asyncio.to_thread for synchronous requests - same as company_aggregator_agent
-    response = await asyncio.to_thread(
-        requests.post, url, headers=headers, json=payload
-    )
-    
-    if response.status_code == 200:
-        data = response.json()
-        return [item.get("snippet", "") for item in data.get("organic", [])]
-    else:
-        raise Exception(f"Serper API error: {response.status_code}")
+        {company_feedback}
+        
+        Use the search tool to find comprehensive information about this company's:
+        - Technologies, tools, and capabilities
+        - Products and services
+        - Case studies and examples
+        - Partnerships and integrations
+        - Market positioning and competitive advantages
+        - Any evidence related to the goal
+        
+        After gathering information, evaluate whether this company meets the goal criteria.
+        Return a structured assessment with:
+        - goal_achieved: whether the company meets the  goal criteria
+        - technologies: relevant technologies, tools, capabilities mentioned
+        - evidences: key supporting evidence (up to 5 most relevant snippets) for the goal
+        - confidence_level: High/Medium/Low confidence in the assessment
+        """
+        
+        # Let the LLM use the search tool and evaluate directly
+        response = await llm_with_output.ainvoke(message)
+        
+        # Convert confidence level to numeric score
+        confidence_score = {
+            "High": 0.9,
+            "Medium": 0.6,
+            "Low": 0.3
+        }.get(response.confidence_level, 0.5)
+        
+        finding = CompanyFinding(
+            domain=domain,
+            confidence_score=confidence_score,
+            evidence_sources=len(response.evidences),
+            findings={
+                "goal_achieved": response.goal_achieved,
+                "technologies": response.technologies,
+                "evidences": response.evidences,
+                "confidence_level": response.confidence_level,
+                "research_goal": research_goal
+            },
+            signals_found=len(response.evidences)
+        )
+        
+        # print(f"🔍 Evaluated {company_name} ({domain}): {response.confidence_level} confidence, {len(response.evidences)} evidences")
+        return finding
+        
+    except Exception as e:
+        print(f"❌ Failed to evaluate {company_name} ({domain}): {e}")
+        return None
 
 def multi_source_search_agent(state: GTMState) -> GTMState:
     if not state.extracted_companies:
@@ -198,121 +153,89 @@ def multi_source_search_agent(state: GTMState) -> GTMState:
     
     # Check if we have quality metrics for feedback
     quality_metrics = state.quality_metrics or {}
-    if quality_metrics:
+    if quality_metrics and 'company_analyses' in quality_metrics:
         print(f"🎯 Using quality metrics feedback for targeted searches")
+        print(f"📊 Found quality data for {len(quality_metrics['company_analyses'])} companies")
     else:
         print(f"📝 Using default search strategies")
+    
+    print(f"🎯 Search depth: {state.search_depth}")
 
-    # TIME QUERY GENERATION
+    # TIME QUERY GENERATION AND EVALUATION
     import time
-    query_start = time.time()
     total_start = time.time()
 
-    async def generate_queries():
-        """Generate queries for all companies using async LLM calls"""
-        print(f"🔍 Building queries for {len(state.extracted_companies)} companies...")
+    async def evaluate_companies():
+        """Evaluate companies using research goal directly"""
+        print(f"🔍 Evaluating {len(state.extracted_companies)} companies using goal...")
         
-        # Create semaphore for concurrent LLM calls
+        # Create semaphore for concurrent processing
         sem = asyncio.Semaphore(state.max_parallel_searches)
         
-        async def generate_queries_for_company(company):
-            """Generate queries for a single company using async LLM"""
+        async def process_single_company(company):
+            """Evaluate a single company using research goal directly"""
             async with sem:
                 try:
-                    queries = await llm_query_builder.build_queries_async(company.name, company.domain, search_goal, state.quality_metrics)
-                    # print(f"  📝 {company.name} ({company.domain}): {queries}")
-                    return queries
+                    # Evaluate company directly using Serper tools
+                    finding = await evaluate_company_with_serper_tool(
+                        company.name,
+                        company.domain,
+                        search_goal,
+                        state.quality_metrics,
+                        state.search_depth
+                    )
+                    
+                    return finding
+                    
                 except Exception as e:
-                    print(f"❌ LLM failed to generate queries for {company.name}: {e}")
-                    # Fallback to simple queries
-                    return [f"{company.name} {search_goal}", f"{company.domain} {search_goal}"]
+                    print(f"❌ Failed to process {company.name}: {e}")
+                    return None
         
-        # Run all query generations in parallel
-        query_tasks = [generate_queries_for_company(company) for company in state.extracted_companies]
-        all_company_queries = await asyncio.gather(*query_tasks)
+        # Run all evaluations in parallel
+        evaluation_tasks = [process_single_company(company) for company in state.extracted_companies]
+        all_findings = await asyncio.gather(*evaluation_tasks)
         
-        # Flatten the results
-        all_queries = []
-        for queries in all_company_queries:
-            all_queries.extend(queries)
+        # Filter out None results
+        valid_findings = [finding for finding in all_findings if finding is not None]
         
-        return all_queries
+        return valid_findings
 
-    async def run_serper_searches(queries):
-        """Run Serper API calls for all queries"""
-        sem = asyncio.Semaphore(state.max_parallel_searches)
-        tasks = [run_serper(query, sem) for query in queries]
-        results = await asyncio.gather(*tasks)
-        
-        # ✅ Write to serper-specific field
-        search_results_serper = dict(state.search_results_serper or {})
-        
-        # Count different types of results
-        api_calls = sum(1 for _, _, result_type in results if result_type == "api")
-        cache_hits = sum(1 for _, _, result_type in results if result_type == "cache")
-        failed_calls = sum(1 for _, _, result_type in results if result_type == "failed")
-        
-        print(f"📊 Processing {len(results)} total queries...")
-        print(f"✅ Successful API calls: {api_calls}")
-        print(f"💾 Cache hits: {cache_hits}")
-        print(f"❌ Failed calls: {failed_calls}")
-        
-        for query, result, result_type in results:
-            # Find which company this query belongs to
-            matched_company = None
-            for company in state.extracted_companies:
-                # Check if this query was generated for this company
-                if (company.name in query or company.domain in query):
-                    matched_company = company
-                    break
-            
-            if matched_company:
-                # print(f"  ✅ Matched query '{query}' to {matched_company.domain} got {len(result)} results")
-                search_results_serper.setdefault(matched_company.domain, []).extend(result)
-            else:
-                # Fallback: try to extract domain from query or use a default
-                print(f"⚠️ Could not match query '{query}' to any company domain")
-                # Add to a general bucket to avoid losing data
-                search_results_serper.setdefault("unknown", []).extend(result)
-
-        return search_results_serper
-
-    # Generate queries
-    queries = asyncio.run(generate_queries())
-    
-    query_end = time.time()
-    query_duration = (query_end - query_start) * 1000
-    print(f"⏱️  Query generation took: {query_duration:.2f}ms ({query_duration/1000:.2f}s)")
-
-    # TIME SERPER API CALLS
-    serper_start = time.time()
-    
-    print("🔎 Running multi-source search for companies...")
-    serper_results = asyncio.run(run_serper_searches(queries))
-    
-    serper_end = time.time()
-    serper_duration = (serper_end - serper_start) * 1000
-    print(f"⏱️  Serper API calls took: {serper_duration:.2f}ms ({serper_duration/1000:.2f}s)")
+    # Run the evaluation process
+    findings = asyncio.run(evaluate_companies())
     
     total_end = time.time()
     total_duration = (total_end - total_start) * 1000
-    print(f"⏱️  Total multi-source search time: {total_duration:.2f}ms ({total_duration/1000:.2f}s)")
+    print(f"⏱️  Total evaluation time: {total_duration:.2f}ms ({total_duration/1000:.2f}s)")
 
-    # ✅ Save to disk for debugging
+    print(f"\n📊 Evaluated {len(findings)} companies in {total_duration:.2f}ms.")
+
+    # Save findings to disk for analysis
     os.makedirs("debug_output", exist_ok=True)
-    output_path = os.path.join("debug_output", "serper_search_output.json")
-    # try:
-    #     with open(output_path, "w", encoding="utf-8") as f:
-    #         json.dump(serper_results, f, ensure_ascii=False, indent=2)
-    #     print(f"📁 Saved Serper search results to {output_path}")
-    # except Exception as e:
-    #     print(f"⚠️ Failed to write Serper search results: {e}")
+    output_path = os.path.join("debug_output", "final_findings.json")
+    try:
+        # Convert findings to serializable format
+        findings_data = []
+        for finding in findings:
+            finding_dict = {
+                "domain": finding.domain,
+                "confidence_score": finding.confidence_score,
+                "evidence_sources": finding.evidence_sources,
+                "findings": finding.findings,
+                "signals_found": finding.signals_found
+            }
+            findings_data.append(finding_dict)
+        
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(findings_data, f, ensure_ascii=False, indent=2)
+        print(f"📁 Saved final findings to {output_path}")
+    except Exception as e:
+        print(f"⚠️ Failed to write final findings: {e}")
 
     # Increment iteration count for feedback loop tracking
     new_iteration_count = state.iteration_count + 1
     print(f"📊 Research Iteration: {new_iteration_count}/{state.max_iterations}")
 
     return state.model_copy(update={
-        "search_results_serper": serper_results,
+        "final_findings": findings,
         "iteration_count": new_iteration_count
     })

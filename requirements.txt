@@ -1,6 +1,7 @@
 # Core LangChain ecosystem
 langchain
 langchain-openai
+langchain-community
 langgraph
 
 # OpenAI and AI
