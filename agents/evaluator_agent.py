@@ -14,7 +14,7 @@ import json
 class EvaluationOutput(BaseModel):
     goal_achieved: bool = Field(..., description="Whether the company meets the research goal criteria")
     technologies: List[str] = Field(..., description="Relevant technologies, tools, or capabilities mentioned")
-    evidences: List[str] = Field(..., description="Relevant text snippets supporting the findings")
+    evidences: List[str] = Field(..., description="Relevant text snippets supporting the findings upto a max of 5")
     confidence_level: str = Field(..., description="High/Medium/Low confidence in the assessment")
 
 class LLMEvidenceEvaluator:
@@ -51,7 +51,7 @@ Consider the research goal holistically - it could be about:
 Return a Pydantic model with:
 - goal_achieved: whether the company meets the research goal criteria
 - technologies: relevant technologies, tools, capabilities, or practices mentioned
-- evidences: list of relevant distinct snippets from the input that support the assessment
+- evidences: list of relevant distinct snippets from the input that support the assessment upto a max of 5
 - confidence_level: High/Medium/Low confidence in the assessment
 """
         )

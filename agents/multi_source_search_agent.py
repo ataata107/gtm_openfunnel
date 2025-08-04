@@ -10,6 +10,7 @@ from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from pydantic import BaseModel, Field
 from utils.connection_pool import connection_pool
+from utils.cache import cache
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -19,7 +20,7 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
 # Structured output for search queries
 class SearchQueriesOutput(BaseModel):
-    queries: List[str] = Field(..., description="List of 3-5 highly targeted search queries for finding evidence about the company")
+    queries: List[str] = Field(..., description="List of 3 highly targeted search queries for finding evidence about the company")
     reasoning: str = Field(..., description="Brief explanation of why these queries were chosen")
     #search_focus: str = Field(..., description="Primary focus area for these queries (e.g., 'case studies', 'technical details', 'user reviews')")
 
@@ -29,7 +30,7 @@ class LLMQueryBuilder:
         self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
         self.structured_llm = self.llm.with_structured_output(SearchQueriesOutput)
         self.prompt = PromptTemplate.from_template("""
-You are an expert search query builder for GTM research. Your task is to generate 3-5 highly targeted search queries for finding evidence about a specific company about a research goal.
+You are an expert search query builder for GTM research. Your task is to generate 3 highly targeted search queries for finding evidence about a specific company about a research goal.
 Remember to add the company name in the queries for a company targeted search.
 
 Company Information:
@@ -41,7 +42,7 @@ Research Goal: {research_goal}
 {company_feedback}
 
 Instructions:
-1. Generate 3-5 search queries that will find the most relevant evidence
+1. Generate 3 search queries that will find the most relevant evidence
 2. Use specific, targeted terms that match the research goal
 3. Include both company-specific and domain-specific variations
 4. Use advanced search operators when helpful (site:, "quotes", AND, OR, etc.)
@@ -50,7 +51,7 @@ Instructions:
 7. If quality feedback is available, prioritize queries that address the specific gaps and issues identified
 
 Return a structured response with:
-- queries: List of 3-5 search queries with company name in the queries
+- queries: List of 3 search queries with company name in the queries
 - reasoning: Brief explanation of your query strategy
 """)
 
@@ -152,13 +153,22 @@ async def run_serper(query: str, sem: asyncio.Semaphore):
     """Run Serper search with connection pooling"""
     async with sem:
         try:
+            # Check cache first
+            cached_results = await cache.get_search_results(query, "serper")
+            if cached_results:
+                print(f"✅ Cache hit for query: {query}")
+                return query, cached_results, "cache"
+            
             # Use connection pooling for API call
             response = await _make_serper_request(query)
-            return query, response
+            
+            # Cache the results
+            await cache.set_search_results(query, "serper", response, ttl=7200)
+            return query, response, "api"
             
         except Exception as e:
-            # print(f"❌ Serper search failed for '{query}': {e}")
-            return query, []
+            print(f"❌ Serper search failed for '{query}': {e}")
+            return query, [], "failed"
 
 async def _make_serper_request(query: str) -> List[str]:
     """Make Serper API request using requests"""
@@ -236,8 +246,18 @@ def multi_source_search_agent(state: GTMState) -> GTMState:
         
         # ✅ Write to serper-specific field
         search_results_serper = dict(state.search_results_serper or {})
-        print(f"📊 Processing {len(results)} search results...")
-        for query, result in results:
+        
+        # Count different types of results
+        api_calls = sum(1 for _, _, result_type in results if result_type == "api")
+        cache_hits = sum(1 for _, _, result_type in results if result_type == "cache")
+        failed_calls = sum(1 for _, _, result_type in results if result_type == "failed")
+        
+        print(f"📊 Processing {len(results)} total queries...")
+        print(f"✅ Successful API calls: {api_calls}")
+        print(f"💾 Cache hits: {cache_hits}")
+        print(f"❌ Failed calls: {failed_calls}")
+        
+        for query, result, result_type in results:
             # Find which company this query belongs to
             matched_company = None
             for company in state.extracted_companies:

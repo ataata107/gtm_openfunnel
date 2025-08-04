@@ -9,6 +9,7 @@ import os
 import json
 import requests
 import logging
+from utils.cache import cache
 
 load_dotenv()
 
@@ -77,11 +78,17 @@ Raw search result:
 async def run_serper(query: str, sem: asyncio.Semaphore, search_depth: str = "standard"):
     async with sem:
         try:
+            # Check cache first
+            cached_results = await cache.get_search_results_with_depth(query, "serper", search_depth)
+            if cached_results:
+                print(f"✅ Cache hit for query: {query} (depth: {search_depth})")
+                return cached_results
+            
             url = "https://google.serper.dev/search"
             
             # Configure search depth
             SEARCH_DEPTH_CONFIGS = {
-                "quick": {"num_results": 15, "description": "15 results per search"},
+                "quick": {"num_results": 10, "description": "10 results per search"},
                 "standard": {"num_results": 20, "description": "20 results per search"},
                 "comprehensive": {"num_results": 30, "description": "30 results per search"}
             }
@@ -117,6 +124,8 @@ async def run_serper(query: str, sem: asyncio.Semaphore, search_depth: str = "st
                     if title or snippet:
                         search_text += f"Title: {title}\nSnippet: {snippet}\nSource URL: {link}\n\n"
                 
+                # Cache the results
+                await cache.set_search_results_with_depth(query, "serper", search_text, search_depth, ttl=7200)
                 return search_text
             else:
                 return f"Error: HTTP {response.status_code}"
