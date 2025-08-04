@@ -126,11 +126,11 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
 
     print("🔍 Running Serper with LLM tools to extract companies...")
     
-    # TIME SERPER + LLM EXTRACTION
+    # TIME PARALLEL EXTRACTION (SERPER + NEWS)
     import time
     extraction_start = time.time()
     
-    async def extract_all_companies():
+    async def extract_all_companies_parallel():
         sem = asyncio.Semaphore(state.max_parallel_searches)
         
         async def extract_single_query(query):
@@ -156,12 +156,51 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
                     print(f"❌ Failed to extract companies from {query}: {e}")
                     return []
 
-        # Run all extractions in parallel
-        tasks = [extract_single_query(query) for query in state.search_strategies_generated]
-        all_results = await asyncio.gather(*tasks)
+        async def extract_news_companies():
+            try:
+                # Extract companies from news using unified LLM approach
+                news_companies = await extract_companies_from_news_queries(
+                    state.search_strategies_generated, 
+                    state.research_goal,
+                    search_depth=state.search_depth,  # Pass search depth for consistent limits
+                    max_parallel=state.max_parallel_searches  # Limit parallel processing
+                )
+                
+                # Add news companies to existing list (avoiding duplicates)
+                news_added = 0
+                for company in news_companies:
+                    if company.domain not in seen_domains:
+                        seen_domains.add(company.domain)
+                        extracted_companies.append(CompanyMeta(**company.dict()))
+                        news_added += 1
+                        
+                        # Stop if we've reached the company limit
+                        if len(extracted_companies) >= max_companies:
+                            print(f"🎯 COMPANY AGGREGATOR: Reached company limit ({max_companies})")
+                            break
+                
+                print(f"📰 Added {news_added} companies from news articles")
+                return news_added
+                    
+            except Exception as e:
+                print(f"❌ News extraction failed: {e}")
+                return 0
+
+        # Run Serper and News extraction in parallel
+        print("🔍 Running Serper and News extraction in parallel...")
         
-        # Combine all results
-        for companies in all_results:
+        # Create tasks for both Serper and News extraction
+        serper_tasks = [extract_single_query(query) for query in state.search_strategies_generated]
+        news_task = extract_news_companies()
+        
+        # Run both in parallel
+        serper_results, news_added = await asyncio.gather(
+            asyncio.gather(*serper_tasks),
+            news_task
+        )
+        
+        # Combine Serper results
+        for companies in serper_results:
             for company in companies:
                 extracted_companies.append(CompanyMeta(**company.dict()))
                 
@@ -173,53 +212,13 @@ def company_aggregator_agent(state: GTMState) -> GTMState:
             if len(extracted_companies) >= max_companies:
                 break
 
-    # Run the async extraction
-    asyncio.run(extract_all_companies())
+    # Run the async parallel extraction
+    asyncio.run(extract_all_companies_parallel())
     
     extraction_end = time.time()
     extraction_duration = (extraction_end - extraction_start) * 1000
-    print(f"⏱️  Serper + LLM extraction took: {extraction_duration:.2f}ms ({extraction_duration/1000:.2f}s)")
-    print(f"🔍 Serper extracted {len(extracted_companies)} companies")
-    
-    # NEW: NEWS-BASED EXTRACTION
-    print("📰 Starting news-based company extraction...")
-    news_start = time.time()
-    
-    async def extract_news_companies():
-        try:
-            # Extract companies from news using unified LLM approach
-            news_companies = await extract_companies_from_news_queries(
-                state.search_strategies_generated, 
-                state.research_goal,
-                search_depth=state.search_depth,  # Pass search depth for consistent limits
-                max_parallel=state.max_parallel_searches  # Limit parallel processing
-            )
-            
-            # Add news companies to existing list (avoiding duplicates)
-            for company in news_companies:
-                if company.domain not in seen_domains:
-                    seen_domains.add(company.domain)
-                    extracted_companies.append(CompanyMeta(**company.dict()))
-                    
-                    # # Stop if we've reached the company limit
-                    # if len(extracted_companies) >= max_companies:
-                    #     print(f"🎯 COMPANY AGGREGATOR: Reached company limit ({max_companies})")
-                    #     break
-            
-            print(f"📰 Added {len(news_companies)} companies from news articles")
-                
-        except Exception as e:
-            print(f"❌ News extraction failed: {e}")
-    
-    # Run the async news extraction
-    asyncio.run(extract_news_companies())
-    
-    news_end = time.time()
-    news_duration = (news_end - news_start) * 1000
-    print(f"⏱️  News extraction took: {news_duration:.2f}ms ({news_duration/1000:.2f}s)")
-    
-    total_duration = (news_end - extraction_start) * 1000
-    print(f"⏱️  Total time: {total_duration:.2f}ms ({total_duration/1000:.2f}s)")
+    print(f"⏱️  Parallel extraction (Serper + News) took: {extraction_duration:.2f}ms ({extraction_duration/1000:.2f}s)")
+    print(f"🔍 Total extracted companies: {len(extracted_companies)}")
 
     # ✅ Save to disk for debugging
     os.makedirs("debug_output", exist_ok=True)
