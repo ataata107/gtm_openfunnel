@@ -6,7 +6,8 @@ A sophisticated **Go-To-Market (GTM) research system** with **real-time streamin
 
 This system automatically:
 - 🔍 **Discovers companies** relevant to your research goal
-- 📊 **Analyzes evidence** from multiple sources (web search, company websites)
+- 📰 **Extracts companies from news articles** using Playwright browser automation
+- 📊 **Analyzes evidence** from multiple sources (web search, news sites, company websites)
 - 🧠 **Evaluates quality** using AI-powered assessment
 - 🔄 **Refines strategies** based on gaps and quality metrics
 - 📈 **Provides insights** with confidence scores and recommendations
@@ -18,7 +19,8 @@ This system automatically:
 ### **Core Components:**
 - **LangGraph Workflow**: Multi-agent orchestration with feedback loops
 - **LLM Agents**: Specialized AI agents for different tasks
-- **External APIs**: Serper (Google Search), FireCrawl (Web Scraping)
+- **External APIs**: Serper (Google Search + News), FireCrawl (Web Scraping)
+- **Browser Automation**: Playwright for automatic news site browsing
 - **Real-time Streaming**: Server-Sent Events for live progress updates
 - **React Frontend**: Modern UI with real-time log streaming
 - **REST API**: FastAPI with streaming and synchronous endpoints
@@ -28,7 +30,7 @@ This system automatically:
 ![GTM Intelligence Workflow](gtm_graph.png)
 
 ```
-Query Agent → Company Aggregator → Multi-Source Search → 
+Query Agent → Company Aggregator (Serper + News) → Multi-Source Search → 
 Website Scraper → Evaluator → Quality Evaluator → (Feedback Loop)
 ```
 
@@ -56,7 +58,13 @@ SERPER_API_KEY=your_serper_api_key
 FIRECRAWL_API_KEY=your_firecrawl_api_key
 ```
 
-### **3. Run the System**
+### **3. Install Playwright (for news agent)**
+```bash
+# Install Playwright browser
+playwright install chromium
+```
+
+### **4. Run the System**
 
 #### **Option A: API Server + React Frontend**
 ```bash
@@ -132,6 +140,8 @@ curl http://localhost:8001/health
 🎯 QUERY AGENT: Generating 8 focused search strategies
 🔍 Building queries for 38 companies...
 ⏱️ Query generation took: 1234.56ms
+📰 Found 15 news articles for query: fintech AI fraud detection
+📰 Extracted 8 companies from https://fintechmagazine.com/...
 🏢 Found company: stripe.com
 📊 Processing search results...
 ✅ Research completed!
@@ -164,8 +174,9 @@ curl http://localhost:8001/health
 
 ### **🤖 Intelligent Agents**
 - **Query Agent**: Generates diverse search strategies
-- **Company Aggregator**: Extracts companies from search results
+- **Company Aggregator**: Extracts companies from search results + news articles
 - **Multi-Source Search**: Performs targeted web searches
+- **News Agent**: Uses Playwright to automatically browse news sites and extract companies
 - **Website Scraper**: Extracts relevant content from company sites
 - **Evaluator**: Assesses evidence against research goals
 - **Quality Evaluator**: Analyzes research coverage and quality
@@ -178,6 +189,7 @@ curl http://localhost:8001/health
 
 ### **📈 Performance Optimization**
 - **Async Processing**: Parallel API calls and LLM operations
+- **Browser Automation**: Playwright for automatic news site browsing
 - **Rate Limiting**: Smart handling of API limits
 - **Error Recovery**: Graceful handling of failures
 - **Memory Management**: Efficient processing of large datasets
@@ -196,6 +208,8 @@ gtm-langgraph/
 │   ├── query_agent.py
 │   ├── company_aggregator_agent.py
 │   ├── multi_source_search_agent.py
+│   ├── news_search_agent.py      # Serper news API integration
+│   ├── news_extractor_agent.py   # Playwright browser automation
 │   ├── website_scraper_agent.py
 │   ├── evaluator_agent.py
 │   └── quality_evaluator_agent.py
