@@ -18,11 +18,18 @@ def clean_json_string(text: str) -> str:
     # Remove null bytes and control characters
     text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
     
-    # Replace problematic characters
+    # Replace problematic characters that can break JSON
     text = text.replace('\r', ' ').replace('\n', ' ')
+    text = text.replace('\\', '\\\\')  # Escape backslashes
+    text = text.replace('"', '\\"')    # Escape quotes
+    text = text.replace('\t', ' ')     # Replace tabs
     
     # Remove any trailing incomplete UTF-8 sequences
     text = text.encode('utf-8', errors='ignore').decode('utf-8')
+    
+    # Limit length to prevent memory issues
+    if len(text) > 10000:
+        text = text[:10000] + "..."
     
     return text.strip()
 

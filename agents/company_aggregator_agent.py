@@ -68,26 +68,22 @@ async def extract_companies_with_serper_tool(query: str, research_goal: str, sea
         
         # Direct message to LLM with tools
         message = f"""
-        Please search for companies relevant to this research goal: {research_goal}
+        Please search for companies relevant to this goal: {query}
+        Use the search tool to search for the goal.
         
-        Use the search tool to find information about companies that match this research objective.
-        Search for terms like "{query}" and related keywords to find relevant companies.
-        
-        IMPORTANT: Extract AT LEAST 60 companies. Be extremely thorough and comprehensive.
+        IMPORTANT: Extract AT LEAST 15-20 companies. Be extremely thorough and comprehensive.
         Include companies that are:
-        - Directly relevant to the research goal
-        - Related to the industry or technology mentioned
+        - Directly relevant to the  goal
         - Competitors or similar companies
         - Companies mentioned in articles, lists, or comparisons
         - Companies from different market segments
         - Both established and emerging companies
         - Companies mentioned in case studies, reports, or reviews
         - Companies from different geographical regions
-        - Companies with different business models
         
-        Search multiple times with different keywords if needed to find more companies.
-        Return a list of AT LEAST 60 COMPANIES. Do not stop at fewer. Prioritize breadth.
-        Output only the companies, each with name and domain, clearly listed.
+        Search multiple times with different keywords related to goal if needed to find more companies.
+        Return AT LEAST 15-20 companies with their names and domains.
+        Focus on comprehensive coverage over perfect relevance.
         """
         
         # Let the LLM use the search tool directly
@@ -97,7 +93,7 @@ async def extract_companies_with_serper_tool(query: str, research_goal: str, sea
         # Cache the results
         await cache.set(cache_key, companies, ttl=7200)
         
-        # print(f"🔍 Extracted {len(companies)} companies from query: {query}")
+        print(f"🔍 Extracted {len(companies)} companies from query: {query}")
         return companies
         
     except Exception as e:

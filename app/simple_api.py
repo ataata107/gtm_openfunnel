@@ -248,6 +248,26 @@ async def start_research_stream(request: ResearchRequest):
                 "failed_requests": 0     # Placeholder
             }
             
+            # Clean and validate the response data
+            def clean_for_json(obj):
+                """Recursively clean objects for JSON serialization"""
+                if isinstance(obj, dict):
+                    return {k: clean_for_json(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [clean_for_json(item) for item in obj]
+                elif isinstance(obj, str):
+                    # Clean string for JSON
+                    cleaned = obj.replace('\r', ' ').replace('\n', ' ')
+                    cleaned = cleaned.replace('\\', '\\\\').replace('"', '\\"')
+                    cleaned = cleaned.encode('utf-8', errors='ignore').decode('utf-8')
+                    return cleaned[:5000] if len(cleaned) > 5000 else cleaned  # Limit length
+                else:
+                    return obj
+            
+            # Clean the response data
+            cleaned_formatted_results = clean_for_json(formatted_results)
+            cleaned_quality_metrics = clean_for_json(quality_metrics_response)
+            
             # Send final results
             final_response = {
                 "type": "results",
@@ -259,14 +279,35 @@ async def start_research_stream(request: ResearchRequest):
                     "total_searches_executed": total_searches,
                     "processing_time_ms": processing_time_ms,
                     "company_domains": company_domains,
-                    "results": formatted_results,
-                    "quality_metrics": quality_metrics_response,
+                    "results": cleaned_formatted_results,
+                    "quality_metrics": cleaned_quality_metrics,
                     "search_performance": search_performance,
                     "status": "completed"
                 }
             }
             
-            yield f"data: {json.dumps(final_response)}\n\n"
+            try:
+                yield f"data: {json.dumps(final_response, ensure_ascii=False)}\n\n"
+            except Exception as json_error:
+                # Fallback with minimal data
+                fallback_response = {
+                    "type": "results",
+                    "data": {
+                        "research_goal": request.research_goal,
+                        "search_depth": request.search_depth,
+                        "total_companies": len(extracted_companies) if extracted_companies else 0,
+                        "search_strategies_generated": search_strategies_generated,
+                        "total_searches_executed": total_searches,
+                        "processing_time_ms": processing_time_ms,
+                        "company_domains": company_domains,
+                        "results": [],
+                        "quality_metrics": {},
+                        "search_performance": search_performance,
+                        "status": "completed",
+                        "error": "JSON serialization issue - results saved to debug files"
+                    }
+                }
+                yield f"data: {json.dumps(fallback_response, ensure_ascii=False)}\n\n"
             
             # Send completion message
             yield f"data: {json.dumps({'type': 'complete', 'message': 'Research completed successfully', 'timestamp': datetime.now().isoformat()})}\n\n"

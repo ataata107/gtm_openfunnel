@@ -81,9 +81,9 @@ async def extract_companies_from_news_queries(queries: List[str], research_goal:
                 try:
                     # Message to LLM with both news search and browser tools
                     message = f"""
-                    Please search for news articles about companies relevant to this goal: {research_goal}
+                    Please search for news articles about companies relevant to this goal: {query}
                     
-                    Use the news_search tool to find recent news article links about companies satisfying the goal.
+                    Use the news_search tool to qury the goal and find recent news article links about companies satisfying the goal.
                     Then use the browser tools to visit all the links you get from news search and extract companies.
                     
                     IMPORTANT: Extract AT LEAST 15-20 companies from the news article links. Be extremely thorough and comprehensive.
@@ -113,7 +113,7 @@ async def extract_companies_from_news_queries(queries: List[str], research_goal:
                             unique_companies.append(company)
                             seen_domains.add(company.domain)
                     
-                    # print(f"📰 Extracted {len(unique_companies)} companies from query: {query}")
+                    print(f"📰 Extracted {len(unique_companies)} companies from query: {query}")
                     return unique_companies
                     
                 except Exception as e:
