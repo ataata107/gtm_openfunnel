@@ -6,6 +6,7 @@ import './App.css';
 function App() {
   const [researchGoal, setResearchGoal] = useState('Find fintech companies using AI for fraud detection');
   const [searchDepth, setSearchDepth] = useState('quick');
+  const [maxIterations, setMaxIterations] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState('');
   const [results, setResults] = useState(null);
@@ -37,6 +38,7 @@ function App() {
       setLogs(prev => prev + '🚀 Starting GTM Research (Streaming Mode)...\n');
       setLogs(prev => prev + `📋 Research Goal: ${researchGoal}\n`);
       setLogs(prev => prev + `🔍 Search Depth: ${searchDepth}\n`);
+      setLogs(prev => prev + `🔄 Max Iterations: ${maxIterations}\n`);
       setLogs(prev => prev + '⏳ Connecting to API stream...\n\n');
 
       // First, make a POST request to start the research
@@ -50,7 +52,7 @@ function App() {
           search_depth: searchDepth,
           max_parallel_searches: 100,
           confidence_threshold: 0.8,
-          max_iterations: 1
+          max_iterations: maxIterations
         })
       });
 
@@ -61,6 +63,7 @@ function App() {
       // Get the response as a stream
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = ''; // Buffer for incomplete data
 
       setLogs(prev => prev + '✅ Connected to API stream\n');
       setLogs(prev => prev + '📡 Receiving real-time updates...\n\n');
@@ -74,7 +77,11 @@ function App() {
         }
 
         const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        buffer += chunk; // Add to buffer
+        
+        // Process complete lines from buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
@@ -95,6 +102,7 @@ function App() {
                    setLogs(prev => prev + `📊 Processing Time: ${data.data.processing_time_ms}ms\n`);
                    setLogs(prev => prev + `🏢 Companies Found: ${data.data.total_companies}\n`);
                    setLogs(prev => prev + `🔍 Search Strategies: ${data.data.search_strategies_generated}\n`);
+                   setLogs(prev => prev + `🔄 Iterations Used: ${data.data.iterations_used || 1}\n`);
                    setLogs(prev => prev + `📈 Quality Score: ${data.data.quality_metrics.quality_score.toFixed(2)}\n`);
                    setLogs(prev => prev + `📈 Coverage Score: ${data.data.quality_metrics.coverage_score.toFixed(2)}\n`);
                    setLogs(prev => prev + '🎉 Research Completed Successfully!\n\n');
@@ -115,7 +123,13 @@ function App() {
                    setLogs(prev => prev + `📡 ${JSON.stringify(data)}\n`);
                }
             } catch (parseError) {
-              setLogs(prev => prev + `⚠️ Error parsing stream data: ${parseError.message}\n`);
+              // Check if it's an incomplete JSON (truncated)
+              if (parseError.message.includes('Unterminated string') || 
+                  parseError.message.includes('Unexpected end of JSON input')) {
+                // Don't log this as an error since it's expected with streaming
+              } else {
+                setLogs(prev => prev + `⚠️ Error parsing stream data: ${parseError.message}\n`);
+              }
             }
           }
         }
@@ -134,6 +148,7 @@ function App() {
     setLogs(prev => prev + '🚀 Starting GTM Research (Regular Mode)...\n');
     setLogs(prev => prev + `📋 Research Goal: ${researchGoal}\n`);
     setLogs(prev => prev + `🔍 Search Depth: ${searchDepth}\n`);
+    setLogs(prev => prev + `🔄 Max Iterations: ${maxIterations}\n`);
     setLogs(prev => prev + '⏳ Sending request to API...\n\n');
 
     try {
@@ -142,7 +157,7 @@ function App() {
         search_depth: searchDepth,
         max_parallel_searches: 100,
         confidence_threshold: 0.8,
-        max_iterations: 1
+        max_iterations: maxIterations
       });
 
       // Add success logs
@@ -150,6 +165,7 @@ function App() {
       setLogs(prev => prev + `📊 Processing Time: ${response.data.processing_time_ms}ms\n`);
       setLogs(prev => prev + `🏢 Companies Found: ${response.data.total_companies}\n`);
       setLogs(prev => prev + `🔍 Search Strategies: ${response.data.search_strategies_generated}\n`);
+      setLogs(prev => prev + `🔄 Iterations Used: ${response.data.iterations_used || 1}\n`);
       setLogs(prev => prev + `📈 Quality Score: ${response.data.quality_metrics.quality_score.toFixed(2)}\n`);
       setLogs(prev => prev + `📈 Coverage Score: ${response.data.quality_metrics.coverage_score.toFixed(2)}\n`);
       setLogs(prev => prev + '🎉 Research Completed Successfully!\n\n');
@@ -249,6 +265,24 @@ function App() {
               <option value="standard">Standard (10 strategies, ~100 companies)</option>
               <option value="comprehensive">Comprehensive (15 strategies, ~200 companies)</option>
             </select>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label htmlFor="maxIterations">Max Iterations:</label>
+            <input
+              id="maxIterations"
+              type="number"
+              className="input"
+              value={maxIterations}
+              onChange={(e) => setMaxIterations(parseInt(e.target.value) || 1)}
+              min="1"
+              max="10"
+              disabled={isLoading}
+              style={{ width: '100px' }}
+            />
+            <small style={{ display: 'block', marginTop: '4px', color: '#666' }}>
+              Number of research iterations (1-10). Higher values allow for more comprehensive analysis.
+            </small>
           </div>
 
           <div style={{ marginBottom: '16px' }}>

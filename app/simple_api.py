@@ -153,12 +153,29 @@ async def start_research_stream(request: ResearchRequest):
             log_queue = queue.Queue()
             
             def stream_log(log_line):
-                log_data = {
-                    "type": "log",
-                    "message": log_line,
-                    "timestamp": datetime.now().isoformat()
-                }
-                log_queue.put(f"data: {json.dumps(log_data)}\n\n")
+                try:
+                    # Clean the log line for JSON
+                    cleaned_log = log_line.replace('\r', ' ').replace('\n', ' ')
+                    cleaned_log = cleaned_log.replace('\\', '\\\\').replace('"', '\\"')
+                    cleaned_log = cleaned_log.encode('utf-8', errors='ignore').decode('utf-8')
+                    cleaned_log = cleaned_log[:2000] if len(cleaned_log) > 2000 else cleaned_log
+                    
+                    log_data = {
+                        "type": "log",
+                        "message": cleaned_log,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    
+                    log_queue.put(f"data: {json.dumps(log_data, ensure_ascii=False)}\n\n")
+                except Exception as e:
+                    # Fallback for problematic log lines
+                    fallback_data = {
+                        "type": "log",
+                        "message": "Log message processing error",
+                        "timestamp": datetime.now().isoformat(),
+                        "error": str(e)[:100]
+                    }
+                    log_queue.put(f"data: {json.dumps(fallback_data, ensure_ascii=False)}\n\n")
             
             # Create log capture with callback
             log_capture = LogCapture(stream_log)
@@ -265,8 +282,19 @@ async def start_research_stream(request: ResearchRequest):
                     return obj
             
             # Clean the response data
-            cleaned_formatted_results = clean_for_json(formatted_results)
-            cleaned_quality_metrics = clean_for_json(quality_metrics_response)
+            try:
+                cleaned_formatted_results = clean_for_json(formatted_results)
+                print(f"✅ Cleaned formatted results successfully")
+            except Exception as e:
+                print(f"❌ Error cleaning formatted results: {e}")
+                cleaned_formatted_results = []
+            
+            try:
+                cleaned_quality_metrics = clean_for_json(quality_metrics_response)
+                print(f"✅ Cleaned quality metrics successfully")
+            except Exception as e:
+                print(f"❌ Error cleaning quality metrics: {e}")
+                cleaned_quality_metrics = {}
             
             # Send final results
             final_response = {
@@ -287,8 +315,11 @@ async def start_research_stream(request: ResearchRequest):
             }
             
             try:
-                yield f"data: {json.dumps(final_response, ensure_ascii=False)}\n\n"
+                # Test JSON serialization first
+                test_json = json.dumps(final_response, ensure_ascii=False)
+                yield f"data: {test_json}\n\n"
             except Exception as json_error:
+                print(f"⚠️ JSON serialization error in final results: {json_error}")
                 # Fallback with minimal data
                 fallback_response = {
                     "type": "results",
