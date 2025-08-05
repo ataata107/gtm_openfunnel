@@ -331,8 +331,6 @@ cd frontend && npm run build
 - **[📖 Documentation Index](docs/README.md)**: Complete documentation guide
 - **[🚀 Quick Start Guide](docs/quick-start.md)**: Get started in 5 minutes
 - **[🌐 API Reference](docs/api/rest-api.md)**: Complete REST API documentation
-- **[⚡ Streaming Guide](docs/api/streaming-api.md)**: Real-time streaming documentation
-- **[🤖 Agent Documentation](docs/agents/)**: Individual agent implementations
 - **[🏗️ Architecture Guide](docs/architecture.md)**: System design and workflow
 
 ## 🤝 **Contributing**
