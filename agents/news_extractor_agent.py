@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from graph.state import ExtractedCompany
 from dotenv import load_dotenv
 from utils.cache import cache
+from utils.circuit_breaker import news_api_circuit_breaker, openai_circuit_breaker, CircuitBreakerOpenError
 
 import nest_asyncio
 from langchain_community.agent_toolkits import PlayWrightBrowserToolkit
@@ -121,8 +122,8 @@ async def extract_companies_from_news_queries(queries: List[str], research_goal:
                     Focus on comprehensive coverage over perfect relevance.
                     """
                     
-                    # Let the LLM use both tools directly
-                    response = await llm_with_output.ainvoke(message)
+                    # Let the LLM use both tools directly with circuit breaker protection
+                    response = await openai_circuit_breaker.call(llm_with_output.ainvoke, message)
                     companies = response.companies
                     
                     # Filter out duplicates
@@ -142,6 +143,9 @@ async def extract_companies_from_news_queries(queries: List[str], research_goal:
                     print(f"📰 Extracted {len(unique_companies)} companies from query: {query}")
                     return unique_companies
                     
+                except CircuitBreakerOpenError as e:
+                    print(f"🔌 Circuit breaker open for news query {query}: {e}")
+                    return []
                 except Exception as e:
                     print(f"❌ Failed to process query {query}: {e}")
                     return []

@@ -20,6 +20,7 @@ from typing import Optional, List, Dict, Any
 
 from graph.gtm_graph import build_gtm_graph
 from graph.state import GTMState
+from utils.circuit_breaker import get_circuit_breaker_status
 
 
 
@@ -112,6 +113,11 @@ class LogCapture:
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@app.get("/circuit-breakers")
+async def get_circuit_breaker_status():
+    """Get status of all circuit breakers"""
+    return get_circuit_breaker_status()
 
 @app.get("/logs")
 async def get_logs():

@@ -8,6 +8,7 @@ import os
 import json
 
 from utils.cache import cache
+from utils.circuit_breaker import serper_circuit_breaker, openai_circuit_breaker, CircuitBreakerOpenError
 from agents.news_extractor_agent import extract_companies_from_news_queries
 from graph.state import ExtractedCompany
 from langchain_community.utilities import GoogleSerperAPIWrapper
@@ -86,8 +87,8 @@ async def extract_companies_with_serper_tool(query: str, research_goal: str, sea
         Focus on comprehensive coverage over perfect relevance.
         """
         
-        # Let the LLM use the search tool directly
-        response = await llm_with_output.ainvoke(message)
+        # Let the LLM use the search tool directly with circuit breaker protection
+        response = await openai_circuit_breaker.call(llm_with_output.ainvoke, message)
         companies = response.companies
         
         # Cache the results
@@ -96,6 +97,9 @@ async def extract_companies_with_serper_tool(query: str, research_goal: str, sea
         print(f"🔍 Extracted {len(companies)} companies from query: {query}")
         return companies
         
+    except CircuitBreakerOpenError as e:
+        print(f"🔌 Circuit breaker open for {query}: {e}")
+        return []
     except Exception as e:
         print(f"❌ Failed to extract companies from {query}: {e}")
         return []
