@@ -135,7 +135,7 @@ Examples of diverse search strategies:
 - "AI fraud detection companies"
 - "machine learning fraud prevention tools"
 - "Companies using AWS"
-- "Companies who are in te process of getting SOC 2"
+- "Companies who are in the process of getting SOC 2"
 Avoid phrases like "Search for...", "Find...", "Look for...", "Companies that...", etc.
 Return exactly {num_strategies} clean, direct and distinct search terms as 'search_strategies_generated'.
 """

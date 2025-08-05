@@ -261,9 +261,9 @@ function App() {
               onChange={(e) => setSearchDepth(e.target.value)}
               disabled={isLoading}
             >
-              <option value="quick">Quick (5 strategies, ~50 companies)</option>
-              <option value="standard">Standard (10 strategies, ~100 companies)</option>
-              <option value="comprehensive">Comprehensive (15 strategies, ~200 companies)</option>
+              <option value="quick">Quick (10 strategies, ~50 companies)</option>
+              <option value="standard">Standard (20 strategies, ~100 companies)</option>
+              <option value="comprehensive">Comprehensive (30 strategies, ~200 companies)</option>
             </select>
           </div>
 
