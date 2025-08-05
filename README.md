@@ -5,14 +5,15 @@ A sophisticated **Go-To-Market (GTM) research system** with **real-time streamin
 ## 🎯 **What It Does**
 
 This system automatically:
-- 🔍 **Discovers companies** relevant to your research goal
+- 🔍 **Discovers companies** relevant to your research goal using Serper search API
 - 📰 **Extracts companies from news articles** using Playwright browser automation
 - 📊 **Analyzes evidence** from multiple sources (web search, news sites, company websites)
-- 🧠 **Evaluates quality** using AI-powered assessment
-- 🔄 **Refines strategies** based on gaps and quality metrics
+- 🧠 **Evaluates quality** using AI-powered assessment with confidence scores
+- 🔄 **Refines strategies** based on gaps and quality metrics (iterative research)
 - 📈 **Provides insights** with confidence scores and recommendations
-- ⚡ **Real-time streaming** of agent logs and progress
-- 🎨 **Modern React UI** for interactive research
+- ⚡ **Real-time streaming** of agent logs and progress via Server-Sent Events
+- 🎨 **Modern React UI** for interactive research with configurable parameters
+- 💾 **Smart caching** with in-memory and Redis support for performance optimization
 
 ## 🏗️ **Architecture**
 
@@ -31,8 +32,15 @@ This system automatically:
 
 ```
 Query Agent → Company Aggregator (Serper + News) → Multi-Source Search → 
-Website Scraper → Evaluator → Quality Evaluator → (Feedback Loop)
+Quality Evaluator → (Feedback Loop with max_iterations)
 ```
+
+### **Key Features:**
+- **🔍 Direct LLM Tool Integration**: Agents use LLM with bound Serper tools for direct extraction
+- **📰 Parallel News Extraction**: Playwright-based news scraping runs alongside Serper searches
+- **🔄 Iterative Research**: Configurable max_iterations for refinement cycles
+- **💾 Smart Caching**: In-memory caching with Redis fallback for performance
+- **⚡ Real-time Streaming**: Server-Sent Events for live progress updates
 
 ## 🚀 **Quick Start**
 
@@ -70,7 +78,7 @@ playwright install chromium
 ```bash
 # Terminal 1: Start API Server
 source openfunnel/bin/activate
-python app/simple_api.py
+python -m uvicorn app.simple_api:app --host 0.0.0.0 --port 8001
 
 # Terminal 2: Start React Frontend
 cd frontend
@@ -105,7 +113,8 @@ curl -X POST "http://localhost:8001/research/stream" \
   -H "Content-Type: application/json" \
   -d '{
     "research_goal": "Find fintech companies using AI for fraud detection",
-    "search_depth": "quick"
+    "search_depth": "quick",
+    "max_iterations": 1
   }'
 ```
 
@@ -117,12 +126,14 @@ curl http://localhost:8001/health
 ## 🎨 **React Frontend**
 
 ### **Features:**
-- ✅ **Real-time streaming** of agent logs
-- ✅ **Interactive research configuration**
-- ✅ **Live progress updates**
-- ✅ **Results visualization**
-- ✅ **Search depth controls**
+- ✅ **Real-time streaming** of agent logs via Server-Sent Events
+- ✅ **Interactive research configuration** with all parameters
+- ✅ **Live progress updates** with detailed agent logs
+- ✅ **Results visualization** with confidence scores
+- ✅ **Search depth controls** (quick/standard/comprehensive)
+- ✅ **Max iterations configuration** (1-10 refinement cycles)
 - ✅ **Streaming vs Regular mode toggle**
+- ✅ **Smart caching** for improved performance
 
 ### **Usage:**
 1. Navigate to `http://localhost:3000`
@@ -136,34 +147,53 @@ curl http://localhost:8001/health
 
 ### **Real-time Streaming Logs:**
 ```
-📊 Starting research...
-🎯 QUERY AGENT: Generating 8 focused search strategies
-🔍 Building queries for 38 companies...
-⏱️ Query generation took: 1234.56ms
-📰 Found 15 news articles for query: fintech AI fraud detection
-📰 Extracted 8 companies from https://fintechmagazine.com/...
-🏢 Found company: stripe.com
-📊 Processing search results...
+🚀 Starting GTM Research (Streaming Mode)...
+📋 Research Goal: Find fintech companies using AI for fraud detection
+🔍 Search Depth: quick
+🔄 Max Iterations: 1
+⏳ Connecting to API stream...
+
+🔍 QUERY AGENT: Starting search strategy generation...
+🎯 QUERY AGENT: Generating 10 focused search strategies
+🔍 COMPANY AGGREGATOR: Targeting 10 results per search, 10 companies per query, 50 companies max
+📰 NEWS EXTRACTOR: Using quick search depth
+🔍 Running Serper and News extraction in parallel...
 ✅ Research completed!
 ```
 
 ### **Final Results:**
 ```json
 {
-  "total_companies": 45,
-  "search_strategies_generated": 8,
-  "processing_time_ms": 28450,
+  "research_goal": "Find fintech companies using AI for fraud detection",
+  "search_depth": "quick",
+  "total_companies": 67,
+  "search_strategies_generated": 10,
+  "total_searches_executed": 45,
+  "iterations_used": 1,
+  "processing_time_ms": 45230,
   "quality_metrics": {
-    "quality_score": 0.84,
-    "coverage_score": 0.76
+    "quality_score": 0.82,
+    "coverage_score": 0.78,
+    "missing_aspects": ["international companies"],
+    "coverage_gaps": ["enterprise solutions"],
+    "evidence_issues": ["outdated information"],
+    "recommendations": ["focus on recent news"]
   },
   "results": [
     {
       "domain": "stripe.com",
       "confidence_score": 0.92,
+      "evidence_sources": 5,
+      "signals_found": 8,
       "findings": {
         "goal_achieved": true,
-        "technologies": ["AI", "Machine Learning"]
+        "technologies": ["AI", "Machine Learning", "Fraud Detection"],
+        "evidences": [
+          "Stripe uses AI-powered fraud detection systems",
+          "Machine learning algorithms analyze transaction patterns"
+        ],
+        "confidence_level": "High",
+        "research_goal": "Find fintech companies using AI for fraud detection"
       }
     }
   ]
@@ -173,13 +203,11 @@ curl http://localhost:8001/health
 ## 🛠️ **Key Features**
 
 ### **🤖 Intelligent Agents**
-- **Query Agent**: Generates diverse search strategies
-- **Company Aggregator**: Extracts companies from search results + news articles
-- **Multi-Source Search**: Performs targeted web searches
-- **News Agent**: Uses Playwright to automatically browse news sites and extract companies
-- **Website Scraper**: Extracts relevant content from company sites
-- **Evaluator**: Assesses evidence against research goals
-- **Quality Evaluator**: Analyzes research coverage and quality
+- **Query Agent**: Generates diverse search strategies with quality feedback integration
+- **Company Aggregator**: Extracts companies from Serper search + Playwright news scraping
+- **Multi-Source Search**: Performs targeted web searches with direct LLM tool integration
+- **News Extractor**: Uses Playwright to automatically browse news sites and extract companies
+- **Quality Evaluator**: Analyzes research coverage and quality with detailed metrics
 
 ### **⚡ Real-time Streaming**
 - **Live Agent Logs**: See agent progress in real-time
@@ -190,9 +218,11 @@ curl http://localhost:8001/health
 ### **📈 Performance Optimization**
 - **Async Processing**: Parallel API calls and LLM operations
 - **Browser Automation**: Playwright for automatic news site browsing
+- **Smart Caching**: In-memory caching with Redis fallback
 - **Rate Limiting**: Smart handling of API limits
 - **Error Recovery**: Graceful handling of failures
 - **Memory Management**: Efficient processing of large datasets
+- **Streaming Optimization**: Server-Sent Events for real-time updates
 
 ### **🎯 Quality Assurance**
 - **Coverage Analysis**: Identifies research gaps
@@ -273,7 +303,8 @@ npm start
 ### **API Parameters**
 - **max_parallel_searches**: Control concurrent operations (default: 100)
 - **confidence_threshold**: Set quality requirements (default: 0.8)
-- **max_iterations**: Limit research cycles (default: 1)
+- **max_iterations**: Limit research cycles (default: 1, range: 1-10)
+- **search_depth**: Control research depth (quick/standard/comprehensive)
 
 ## 🚀 **Deployment**
 
@@ -297,10 +328,12 @@ cd frontend && npm run build
 
 ## 📚 **Documentation**
 
-- **[API Documentation](docs/API.md)**: Complete REST API guide
-- **[Streaming Guide](docs/STREAMING_GUIDE.md)**: Real-time streaming documentation
-- **[Agent Documentation](agents/)**: Individual agent implementations
-- **[Graph Documentation](graph/)**: LangGraph workflow details
+- **[📖 Documentation Index](docs/README.md)**: Complete documentation guide
+- **[🚀 Quick Start Guide](docs/quick-start.md)**: Get started in 5 minutes
+- **[🌐 API Reference](docs/api/rest-api.md)**: Complete REST API documentation
+- **[⚡ Streaming Guide](docs/api/streaming-api.md)**: Real-time streaming documentation
+- **[🤖 Agent Documentation](docs/agents/)**: Individual agent implementations
+- **[🏗️ Architecture Guide](docs/architecture.md)**: System design and workflow
 
 ## 🤝 **Contributing**
 
@@ -316,4 +349,15 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**Built with ❤️ using LangGraph, LangChain, OpenAI, FastAPI, and React** 
+**Built with ❤️ using LangGraph, LangChain, OpenAI, FastAPI, React, and Playwright**
+
+## 🆕 **Recent Updates**
+
+### **v1.0.0 (December 2024)**
+- ✅ **Max Iterations Parameter**: Configurable research refinement cycles (1-10)
+- ✅ **Enhanced Caching**: In-memory caching with Redis fallback
+- ✅ **Parallel News Extraction**: Playwright-based news scraping alongside Serper searches
+- ✅ **Direct LLM Tool Integration**: Agents use bound Serper tools for direct extraction
+- ✅ **Improved Streaming**: Server-Sent Events with proper JSON buffering
+- ✅ **Comprehensive Documentation**: Complete docs structure with examples
+- ✅ **Performance Optimization**: Reduced LLM invocation times and memory usage 
