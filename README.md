@@ -351,7 +351,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🆕 **Recent Updates**
 
-### **v1.0.0 (December 2024)**
+### **v1.0.0 (Aug 2025)**
 - ✅ **Max Iterations Parameter**: Configurable research refinement cycles (1-10)
 - ✅ **Enhanced Caching**: In-memory caching with Redis fallback
 - ✅ **Parallel News Extraction**: Playwright-based news scraping alongside Serper searches
